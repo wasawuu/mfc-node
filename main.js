@@ -1,6 +1,6 @@
 'use strict';
 var Promise = require('bluebird');
-var fs = require('fs');
+var fs = Promise.promisifyAll(require('fs'));
 var yaml = require('js-yaml');
 var moment = require('moment');
 var mkdirp = require('mkdirp');
@@ -28,6 +28,16 @@ function printDebugMsg(msg) {
   if (config.debug && msg) {
     console.log(colors.blue('[' + getCurrentDateTime() + ']'), colors.yellow('[DEBUG]'), msg);
   }
+}
+
+function getTimestamp() {
+  return Math.floor(new Date().getTime() / 1000);
+}
+
+function dumpModelsCurrentlyCapturing() {
+  _.each(modelsCurrentlyCapturing, function(m) {
+    printDebugMsg(colors.red(m.pid) + "\t" + m.checkAfter + "\t" + m.filename + "\t" + m.size + ' bytes');
+  });
 }
 
 function getFileno() {
@@ -216,7 +226,9 @@ function selectMyModels(onlineModels) {
 }
 
 function createCaptureProcess(model) {
-  if (modelsCurrentlyCapturing.indexOf(model.uid) != -1) {
+  var modelCurrentlyCapturing = _.findWhere(modelsCurrentlyCapturing, {uid: model.uid});
+
+  if (!!modelCurrentlyCapturing) {
     printDebugMsg(colors.green(model.nm) + ' is already capturing');
     return; // resolve immediately
   }
@@ -252,10 +264,14 @@ function createCaptureProcess(model) {
       captureProcess.on('close', function(code) {
         printMsg(colors.green(model.nm) + ' stopped streaming');
 
-        var modelIndex = modelsCurrentlyCapturing.indexOf(model.uid);
+        var modelCurrentlyCapturing = _.findWhere(modelsCurrentlyCapturing, {pid: captureProcess.pid});
 
-        if (modelIndex !== -1) {
-          modelsCurrentlyCapturing.splice(modelIndex, 1);
+        if (!!modelCurrentlyCapturing) {
+          var modelIndex = modelsCurrentlyCapturing.indexOf(modelCurrentlyCapturing);
+
+          if (modelIndex !== -1) {
+            modelsCurrentlyCapturing.splice(modelIndex, 1);
+          }
         }
 
         fs.stat(config.captureDirectory + '/' + filename, function(err, stats) {
@@ -278,11 +294,61 @@ function createCaptureProcess(model) {
       });
 
       if (!!captureProcess.pid) {
-        modelsCurrentlyCapturing.push(model.uid);
+        modelsCurrentlyCapturing.push({
+          nm: model.nm,
+          uid: model.uid,
+          filename: filename,
+          captureProcess: captureProcess,
+          pid: captureProcess.pid,
+          checkAfter: getTimestamp() + 600, // we are gonna check the process after 10 min
+          size: 0
+        });
       }
     })
     .catch(function(err) {
       printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
+    });
+}
+
+function checkCaptureProcess(model) {
+  if (!model.checkAfter || model.checkAfter > getTimestamp()) {
+    // if this is not the time to check the process then we resolve immediately
+    printDebugMsg(colors.green(model.nm) + ' - OK');
+    return;
+  }
+
+  printDebugMsg(colors.green(model.nm) + ' should be checked');
+
+  return fs
+    .statAsync(config.captureDirectory + '/' + model.filename)
+    .then(function(stats) {
+      // we check the process every 10 minutes since the its start,
+      // if the size of the file has not changed over the time, we kill the process
+      if (stats.size - model.size > 0) {
+        printDebugMsg(colors.green(model.nm) + ' - OK');
+
+        modelsCurrentlyCapturing.forEach(function(m) {
+          if (m.uid == model.uid && m.pid == model.pid) {
+            m.checkAfter = getTimestamp() + 600; // 10 minutes
+            m.size = stats.size;
+          }
+        });
+      } else if (!!model.captureProcess) {
+        // we assume that onClose will do clean up for us
+        printErrorMsg('[' + colors.green(model.nm) + '] Process is dead');
+        model.captureProcess.kill();
+      } else {
+        // suppose here we should forcefully remove the model from modelsCurrentlyCapturing
+        // because her captureProcess is unset, but let's leave this as is
+      }
+    })
+    .catch(function(err) {
+      if (err.code == 'ENOENT') {
+        // do nothing, file does not exists,
+        // this is kind of impossible case, however, probably there should be some code to "clean up" the process
+      } else {
+        printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
+      }
     });
 }
 
@@ -302,11 +368,18 @@ function mainLoop() {
     .then(function(myModels) {
       return Promise.all(myModels.map(createCaptureProcess));
     })
+    .then(function() {
+      printDebugMsg('checkCaptureProcess');
+      return Promise.all(modelsCurrentlyCapturing.map(checkCaptureProcess));
+    })
     .catch(function(err) {
       printErrorMsg(err);
     })
     .finally(function() {
+      dumpModelsCurrentlyCapturing();
+
       printMsg('Done, will search for new models in ' + config.modelScanInterval + ' second(s).');
+
       setTimeout(mainLoop, config.modelScanInterval * 1000);
     });
 }
