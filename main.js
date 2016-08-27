@@ -173,51 +173,99 @@ function selectMyModels(onlineModels) {
         }
       }
 
+      // we go through the list on models we want to "include",
+      // if we could not find "include" model in the collection of online models then we skip this model till the next time,
+      // otherwise
+      // if this model is already in our config.models we remove "excluded" flag if it was set before,
+      // if this model is not in our config.models we "push" her in config.models
       config.includeModels = _.reject(config.includeModels, function(nm) {
-        // if we managed to find id of the model in the collection of online models
-        // we add her id in models and remove he from includeModels
-        var model = _.findWhere(onlineModels, {nm: nm});
+        var onlineModel = _.findWhere(onlineModels, {nm: nm});
 
-        if (!model) {
+        if (!onlineModel) { // skip
           return false;
-        } else {
-          config.models.push(model.uid);
-          dirty = true;
-          return true;
         }
+
+        // 1st we look for existing record of this model in config.models
+        var myModel = _.findWhere(config.models, {uid: onlineModel.uid});
+
+        if (!myModel) { // if there is no existing record then we "push"
+          config.models.push({
+            uid: onlineModel.uid,
+            nm: onlineModel.nm
+          });
+
+          dirty = true;
+        } else if (!!myModel.excluded) { // if the model was "excluded" before we "include" her back
+          delete myModel.excluded;
+
+          dirty = true;
+        }
+
+        return true;
       });
 
+      // we go through the list on models we want to "exclude",
+      // if we could not find "exclude" model in the collection of online models then we skip this model till the next time,
+      // otherwise
+      // if this model is already in our config.models we set "excluded" flag if it was set before,
+      // if this model is not in our config.models we "push" her in config.models, but mark her as "excluded"
       config.excludeModels = _.reject(config.excludeModels, function(nm) {
-        // if we managed to find id of the model in the collection of online models
-        // we remove her id in models and remove he from excludeModels
-        var model = _.findWhere(onlineModels, {nm: nm});
+        var onlineModel = _.findWhere(onlineModels, {nm: nm});
 
-        if (!model) {
+        if (!onlineModel) { // skip
           return false;
-        } else {
-          config.models = _.without(config.models, model.uid);
+        }
+
+        var myModel = _.findWhere(config.models, {uid: onlineModel.uid});
+
+        if (!myModel) { // if there is no existing record then we "push"
+          config.models.push({
+            uid: onlineModel.uid,
+            nm: onlineModel.nm,
+            excluded: true
+          });
+
           dirty = true;
-          return true;
+        } else if (!myModel.excluded) { // then we "exclude" the model
+          myModel.excluded = true;
+
+          dirty = true;
+        }
+
+        return true;
+      });
+
+      var myModels = [];
+
+      _.each(config.models, function(myModel) {
+        var onlineModel = _.findWhere(onlineModels, {uid: myModel.uid});
+
+        if (onlineModel) {
+          // if the model does not have a name in config.models we use her name by default
+          if (!myModel.nm) {
+            myModel.nm = onlineModel.nm;
+
+            dirty = true;
+          }
+
+          if (!myModel.excluded) {
+            // override model's name by the name from config
+            onlineModel.nm = myModel.nm;
+
+            if (onlineModel.vs === 0) {
+              myModels.push(onlineModel);
+            } else {
+              printMsg(colors.magenta(onlineModel.nm) + ' is away or in a private');
+            }
+          }
         }
       });
 
       if (dirty) {
+        printDebugMsg('Save changes in config.yml');
+
         fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
       }
-
-      var myModels = [];
-
-      _.each(config.models, function(uid) {
-        var model = _.findWhere(onlineModels, {uid: uid});
-
-        if (model) {
-          if (model.vs === 0) {
-            myModels.push(model);
-          } else {
-            printMsg(colors.magenta(model.nm) + ' is away or in a private');
-          }
-        }
-      });
 
       printDebugMsg(myModels.length  + ' model(s) to capture');
 
@@ -317,7 +365,7 @@ function checkCaptureProcess(model) {
     return;
   }
 
-  printDebugMsg(colors.green(model.nm) + ' should be checked');
+  // printDebugMsg(colors.green(model.nm) + ' should be checked');
 
   return fs
     .statAsync(config.captureDirectory + '/' + model.filename)
@@ -404,5 +452,26 @@ mkdirp(config.completeDirectory, function(err) {
     process.exit(1);
   }
 });
+
+// convert the list of models to the new format
+var dirty = false;
+
+if (config.models.length > 0) {
+  config.models = config.models.map(function(m) {
+
+    if (typeof m === 'number') { // then this "simple" uid
+      dirty = true;
+      m = {uid: m};
+    }
+
+    return m;
+  });
+}
+
+if (dirty) {
+  printDebugMsg('Update config.yml');
+
+  fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
+}
 
 mainLoop();

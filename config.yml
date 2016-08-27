@@ -1,13 +1,12 @@
-captureDirectory: captures # Where you want the captures to be saved to
-completeDirectory: complete # Where you want the "finalized" captures to be moved to as soon as model stops streaming
-modelScanInterval: 30 # In seconds, how often to check for newly-online models
+captureDirectory: /Users/sstativa/Sites/mfc-node/captures
+completeDirectory: /Users/sstativa/Sites/mfc-node/complete
+modelScanInterval: 30
 debug: true
-# here will be ids of your favourite models,
-# if you know model's id you can add it straight away here (check YAML specification for collections)
-models: []
-# if you don't know id of the model, you can add her name here,
-# the next time the model goes online her id will be added to "models" automatically
+models:
+  - uid: 3052158
+  - uid: 17988279
+  - uid: 7784644
+    nm: Brielle
+    excluded: true
 includeModels: []
-# if you don't want to capture the model anymore, but you don't know her id, you can add her name here
-# the next time the model goes online her id will be removed from "models" automatically
 excludeModels: []
