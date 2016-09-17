@@ -5,6 +5,8 @@ mfc-node lets you follow and archive your favorite models' shows on myfreecams.c
 
 This is an attempt to create a script similar to [capturbate-node](https://github.com/SN4T14/capturebate-node) based on different pieces of code found in the Internet.
 
+![alt screenshot](./screenshot.png)
+
 Credits:
 * [capturbate-node](https://github.com/SN4T14/capturebate-node)
 
@@ -14,7 +16,7 @@ Requirements
 ==========
 (Debian 7, minimum)
 
-[Node.js](https://nodejs.org/download/) used to run mfc-node, hence the name.
+[Node.js](https://nodejs.org/download/) used to run mfc-node, hence the name. (Tested on `4.4.7` and `6.3.1`)
 
 [ffmpeg](https://www.ffmpeg.org/download.html)
 
@@ -25,7 +27,8 @@ Install requirements, run `npm install` in the same folder as main.js is.
 
 Edit `config.yml` file and set desirable values for `captureDirectory`, `completeDirectory`, `modelScanInterval`.
 
-Open `updates.yml` file and add names of your favorite models in `includeModels`.
+Open `updates.yml` file and add names of your favorite models in `includeModels` or add  uids of your favorite models in `includeUids`:
+
 ```
 includeModels: [aaaa, bbbb, cccc]
 ```
@@ -40,29 +43,22 @@ For more details please check YAML specification for [collections](http://symfon
 
 Be mindful when capturing many streams at once to have plenty of space on disk and the bandwidth available or you’ll end up dropping a lot of frames and the files will be useless.
 
+> Note: You should edit `config.yml` file only when the script is not running, otherwise, there is a big chance that your changes will be lost.
+
+> Note: It's not recommended to edit `models` section of `config.yml`. If you want to include, exclude or delete the model consider to use of `includeModels`, `excludeModels` and `deleteModels` sections or use web interface.
+
 Running
 ===========
 
 To start capturing streams you need to run `node main.js` I recommend you do this in [screen](https://www.gnu.org/software/screen/) as that'll keep running if you lose connection to the machine or otherwise close your shell.
 
-For advanced users only
+Control
 ===========
+Open url `http://<ip of machine running script>:9080` in your browser. The list of online models will be displayed with a set of allowed commands for each model.
 
-This section is for advance users to explain the main logic of the script and some other options.
+* __Include__ - if you want to record the model
+* __Exclude__ - if you don't want to record the model anymore
+* __Delete__ - if you are not interested in the model and wanna hide her permanently
 
-The script reads `config.yml` file only once at start therefore if you want to add or remove models you should do this through `updates.yml` file. The script checks this file every `modelScanInterval` and if it finds models to include or exclude it moves them to `config.yml` file.
-
-You still can edit `config.yml` directly, but this should be done when the script is not running otherwise there is a possibility to lose all changes you made.
-
-If the model you want to exclude has a running capturing process this process will be not terminated until the model stops streaming, however, the script will not start capturing this model next time when she goes online.
-
-The `models` collection has been changed from the "flat list" to the collection of "objects". The script will automatically convert `models` collection to the new format at the start. Each model's "object" will have fields: 'uid', 'nm' and 'excluded'(this one is optional):
-* `uid` - this is id of the model,
-* `nm` - "local" name of the model. The default value for this field will be the model's name, however you can change it to any value you want. This field is used to generate filenames and allows to avoid situation when the model constantly changes her name (please do not use the same name for different models),
-* `excluded` - if the field is set and is equal true, the script will ignore this model and not create a capturing process when the model goes online. You can set this flag either manually by editing `config.yml` file or by adding model's name in `includeModels` (will set `excluded` to false) or by adding model's name in `excludedModels` (will set `excluded` to true).
-
-
-
-
-
-
+> Note: This is not real-time application. Whenever your __include__, __exclude__ or __delete__ the model your changes will be applied only with the next iteration of `mainLoop` function of the script. `mainLoop` runs every `modelScanInterval` (default: 30sec).
+> There is no __auto reload__ feature, you have to reload the list manually (__big red button__), however, keep in mind this list is updated internally every `modelScanInterval`.

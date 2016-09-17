@@ -6,11 +6,13 @@ var moment = require('moment');
 var mkdirp = require('mkdirp');
 var S = require('string');
 var WebSocketClient = require('websocket').client;
-var http = require('http');
+var bhttp = require('bhttp');
 var colors = require('colors');
 var _ = require('underscore');
 var childProcess = require('child_process');
 var path = require('path');
+var dispatcher = require('httpdispatcher');
+var http = require('http');
 
 function getCurrentDateTime() {
   return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
@@ -36,8 +38,39 @@ function getTimestamp() {
 
 function dumpModelsCurrentlyCapturing() {
   _.each(modelsCurrentlyCapturing, function(m) {
-    printDebugMsg(colors.red(m.pid) + "\t" + m.checkAfter + "\t" + m.filename + "\t" + m.size + ' bytes');
+    printDebugMsg(colors.red(m.pid) + '\t' + m.checkAfter + '\t' + m.filename + '\t' + m.size + ' bytes');
   });
+}
+
+function getUid(nm) {
+  var onlineModel = _.findWhere(onlineModels, {nm: nm});
+
+  return _.isUndefined(onlineModel) ? false : onlineModel.uid;
+}
+
+function remove(value, array) {
+  var idx = array.indexOf(value);
+
+  if (idx != -1) {
+    array.splice(idx, 1);
+  }
+}
+
+// returns true, if the mode has been changed
+function setMode(uid, mode) {
+  var configModel = _.findWhere(config.models, {uid: uid});
+
+  if (_.isUndefined(configModel)) {
+    config.models.push({uid: uid, mode: mode});
+
+    return true;
+  } else if (configModel.mode != mode) {
+    configModel.mode = mode;
+
+    return true;
+  }
+
+  return false;
 }
 
 function getFileno() {
@@ -76,198 +109,139 @@ function getFileno() {
 }
 
 function getOnlineModels(fileno) {
-  return new Promise(function(resolve, reject) {
-    var url = 'http://www.myfreecams.com/mfc2/php/mobj.php?f=' + fileno + '&s=xchat20';
+  var url = 'http://www.myfreecams.com/mfc2/php/mobj.php?f=' + fileno + '&s=xchat20';
 
-    printDebugMsg(url);
+  printDebugMsg(url);
 
-    http
-      .get(url, function(response) {
-        var rawHTML = '';
+  return Promise
+    .try(function() {
+      return session.get(url);
+    })
+    .then(function(response) {
+      try {
+        var rawHTML = response.body.toString('utf8');
+        rawHTML = rawHTML.substring(rawHTML.indexOf('{'), rawHTML.indexOf('\n') - 1);
+        rawHTML = rawHTML.replace(/[^\x20-\x7E]+/g, '');
 
-        if (response.statusCode == 200) {
-          response.on('data', function(data) {
-            rawHTML += data;
-          });
+        var data = JSON.parse(rawHTML);
+      } catch (err) {
+        throw new Error('Failed to parse data');
+      }
 
-          response.on('end', function() {
-            try {
-              rawHTML = rawHTML.toString('utf8');
-              rawHTML = rawHTML.substring(rawHTML.indexOf('{'), rawHTML.indexOf("\n") - 1);
-              rawHTML = rawHTML.replace(/[^\x20-\x7E]+/g, '');
+      onlineModels = [];
 
-              var data = JSON.parse(rawHTML);
-
-              var onlineModels = [];
-
-              for (var key in data) {
-                if (data.hasOwnProperty(key) && typeof data[key].nm != 'undefined' && typeof data[key].uid != 'undefined') {
-                  onlineModels.push({
-                    nm: data[key].nm,
-                    uid: data[key].uid,
-                    vs: data[key].vs,
-                    camserv: data[key].u.camserv,
-                    camscore: data[key].m.camscore,
-                    new_model: data[key].m.new_model
-                  });
-                }
-              }
-
-              printMsg(onlineModels.length  + ' model(s) online');
-
-              resolve(onlineModels);
-            } catch (err) {
-              reject(err);
-            }
-          });
-        } else {
-          reject('Invalid response: ' + response.statusCode);
+      for (var key in data) {
+        if (data.hasOwnProperty(key) && typeof data[key].nm != 'undefined' && typeof data[key].uid != 'undefined') {
+          onlineModels.push(data[key]);
         }
-      })
-      .on('error', function(err) {
-        reject(err);
-      });
-  }).timeout(30000); // 30 secs
+      }
+
+      printMsg(onlineModels.length  + ' model(s) online');
+    })
+    .timeout(30000); // 30 secs
 }
 
-function selectMyModels(onlineModels) {
+function selectMyModels() {
   return Promise
     .try(function() {
       printDebugMsg(config.models.length + ' model(s) in config');
 
       var dirty = false;
-      var stats = fs.statSync('updates.yml');
 
-      if (stats.isFile()) {
-        var updates = yaml.safeLoad(fs.readFileSync('updates.yml', 'utf8'));
+      // to include the model only knowing her name, we need to know her uid,
+      // if we could not find model's uid in array of online models we skip this model till the next iteration
+      config.includeModels = _.filter(config.includeModels, function(nm) {
+        var uid = getUid(nm);
 
-        if (!updates.includeModels) {
-          updates.includeModels = [];
+        if (uid === false) {
+          return true; // keep the model till the next iteration
         }
 
-        if (!updates.excludeModels) {
-          updates.excludeModels = [];
+        config.includeUids.push(uid);
+        dirty = true;
+      });
+
+      config.excludeModels = _.filter(config.excludeModels, function(nm) {
+        var uid = getUid(nm);
+
+        if (uid === false) {
+          return true; // keep the model till the next iteration
         }
 
-        // first we push changes to main config
-        if (updates.includeModels.length > 0) {
-          printMsg(updates.includeModels.length + ' model(s) to include');
+        config.excludeUids.push(uid);
+        dirty = true;
+      });
 
-          config.includeModels = _.union(config.includeModels, updates.includeModels);
-          dirty = true;
+      config.deleteModels = _.reject(config.deleteModels, function(nm) {
+        var uid = getUid(nm);
+
+        if (uid === false) {
+          return true; // keep the model till the next iteration
         }
 
-        if (updates.excludeModels.length > 0) {
-          printMsg(updates.excludeModels.length + ' model(s) to exclude');
+        config.deleteUids.push(uid);
+        dirty = true;
+      });
 
-          config.excludeModels = _.union(config.excludeModels, updates.excludeModels);
-          dirty = true;
-        }
+      _.each(config.includeUids, function(uid) {
+        dirty = setMode(uid, 1) || dirty;
+      });
 
-        // if there were some updates, then we reset updates.yml
-        if (dirty) {
-          updates.includeModels = [];
-          updates.excludeModels = [];
+      config.includeUids = [];
 
-          fs.writeFileSync('updates.yml', yaml.safeDump(updates), 0, 'utf8');
-        }
+      _.each(config.excludeUids, function(uid) {
+        dirty = setMode(uid, 0) || dirty;
+      });
+
+      config.excludeUids = [];
+
+      _.each(config.deleteUids, function(uid) {
+        dirty = setMode(uid, -1) || dirty;
+      });
+
+      config.deleteUids = [];
+
+      // remove duplicates
+      if (dirty) {
+        config.models = _.uniq(config.models, function(m) {
+          return m.uid;
+        });
       }
-
-      // we go through the list on models we want to "include",
-      // if we could not find "include" model in the collection of online models then we skip this model till the next time,
-      // otherwise
-      // if this model is already in our config.models we remove "excluded" flag if it was set before,
-      // if this model is not in our config.models we "push" her in config.models
-      config.includeModels = _.reject(config.includeModels, function(nm) {
-        var onlineModel = _.findWhere(onlineModels, {nm: nm});
-
-        if (!onlineModel) { // skip
-          return false;
-        }
-
-        // 1st we look for existing record of this model in config.models
-        var myModel = _.findWhere(config.models, {uid: onlineModel.uid});
-
-        if (!myModel) { // if there is no existing record then we "push"
-          config.models.push({
-            uid: onlineModel.uid,
-            nm: onlineModel.nm
-          });
-
-          dirty = true;
-        } else if (!!myModel.excluded) { // if the model was "excluded" before we "include" her back
-          delete myModel.excluded;
-
-          dirty = true;
-        }
-
-        return true;
-      });
-
-      // we go through the list on models we want to "exclude",
-      // if we could not find "exclude" model in the collection of online models then we skip this model till the next time,
-      // otherwise
-      // if this model is already in our config.models we set "excluded" flag if it was set before,
-      // if this model is not in our config.models we "push" her in config.models, but mark her as "excluded"
-      config.excludeModels = _.reject(config.excludeModels, function(nm) {
-        var onlineModel = _.findWhere(onlineModels, {nm: nm});
-
-        if (!onlineModel) { // skip
-          return false;
-        }
-
-        var myModel = _.findWhere(config.models, {uid: onlineModel.uid});
-
-        if (!myModel) { // if there is no existing record then we "push"
-          config.models.push({
-            uid: onlineModel.uid,
-            nm: onlineModel.nm,
-            excluded: true
-          });
-
-          dirty = true;
-        } else if (!myModel.excluded) { // then we "exclude" the model
-          myModel.excluded = true;
-
-          dirty = true;
-        }
-
-        return true;
-      });
 
       var myModels = [];
 
-      _.each(config.models, function(myModel) {
-        var onlineModel = _.findWhere(onlineModels, {uid: myModel.uid});
+      _.each(config.models, function(configModel) {
+        var onlineModel = _.findWhere(onlineModels, {uid: configModel.uid});
 
-        if (onlineModel) {
+        if (!_.isUndefined(onlineModel)) {
           // if the model does not have a name in config.models we use her name by default
-          if (!myModel.nm) {
-            myModel.nm = onlineModel.nm;
-
+          if (!configModel.nm) {
+            configModel.nm = onlineModel.nm;
             dirty = true;
           }
 
-          if (!myModel.excluded) {
-            // override model's name by the name from config
-            onlineModel.nm = myModel.nm;
+          onlineModel.mode = configModel.mode;
 
+          if (onlineModel.mode == 1) {
             if (onlineModel.vs === 0) {
               myModels.push(onlineModel);
+            } else if (onlineModel.vs === 90) {
+              printDebugMsg(colors.green(onlineModel.nm) + ' has vs == 90');
+              myModels.push(onlineModel);
             } else {
-              printMsg(colors.magenta(onlineModel.nm) + ' is away or in a private');
+              printMsg(colors.green(onlineModel.nm) + ' is away or in a private');
             }
           }
         }
       });
+
+      printDebugMsg(myModels.length  + ' model(s) to capture');
 
       if (dirty) {
         printDebugMsg('Save changes in config.yml');
 
         fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
       }
-
-      printDebugMsg(myModels.length  + ' model(s) to capture');
 
       return myModels;
     });
@@ -276,7 +250,7 @@ function selectMyModels(onlineModels) {
 function createCaptureProcess(model) {
   var modelCurrentlyCapturing = _.findWhere(modelsCurrentlyCapturing, {uid: model.uid});
 
-  if (!!modelCurrentlyCapturing) {
+  if (!_.isUndefined(modelCurrentlyCapturing)) {
     printDebugMsg(colors.green(model.nm) + ' is already capturing');
     return; // resolve immediately
   }
@@ -292,8 +266,8 @@ function createCaptureProcess(model) {
         '-v',
         'fatal',
         '-i',
-        'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490',
-        // 'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/mfc_' + (100000000 + model.uid) + '.f4v_aac/playlist.m3u8?nc=1423603882490',
+        'http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490',
+        // 'http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/mfc_' + (100000000 + model.uid) + '.f4v_aac/playlist.m3u8?nc=1423603882490',
         '-c',
         'copy',
         config.captureDirectory + '/' + filename
@@ -314,7 +288,8 @@ function createCaptureProcess(model) {
 
         var modelCurrentlyCapturing = _.findWhere(modelsCurrentlyCapturing, {pid: captureProcess.pid});
 
-        if (!!modelCurrentlyCapturing) {
+        if (!_.isUndefined(modelCurrentlyCapturing)) {
+
           var modelIndex = modelsCurrentlyCapturing.indexOf(modelCurrentlyCapturing);
 
           if (modelIndex !== -1) {
@@ -329,8 +304,10 @@ function createCaptureProcess(model) {
             } else {
               printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
             }
-          } else if (stats.size === 0) {
-            fs.unlink(config.captureDirectory + '/' + filename);
+          } else if (stats.size < (config.minFileSizeMb * 1048576)) {
+            fs.unlink(config.captureDirectory + '/' + filename, function(err) {
+              // do nothing, shit happens
+            });
           } else {
             fs.rename(config.captureDirectory + '/' + filename, config.completeDirectory + '/' + filename, function(err) {
               if (err) {
@@ -359,30 +336,36 @@ function createCaptureProcess(model) {
 }
 
 function checkCaptureProcess(model) {
-  if (!model.checkAfter || model.checkAfter > getTimestamp()) {
-    // if this is not the time to check the process then we resolve immediately
-    printDebugMsg(colors.green(model.nm) + ' - OK');
-    return;
+  var onlineModel = _.findWhere(onlineModels, {uid: model.uid});
+
+  if (!_.isUndefined(onlineModel)) {
+    if (onlineModel.mode == 1) {
+      onlineModel.capturing = true;
+    } else if (!!model.captureProcess) {
+      // if the model has been excluded or deleted we stop capturing process and resolve immediately
+      printDebugMsg(colors.green(model.nm) + ' has to be stopped');
+      model.captureProcess.kill();
+      return;
+    }
   }
 
-  // printDebugMsg(colors.green(model.nm) + ' should be checked');
+  // if this is not the time to check the process then we resolve immediately
+  if (model.checkAfter > getTimestamp()) {
+    return;
+  }
 
   return fs
     .statAsync(config.captureDirectory + '/' + model.filename)
     .then(function(stats) {
-      // we check the process every 10 minutes since the its start,
-      // if the size of the file has not changed over the time, we kill the process
+      // we check the process every 10 minutes since its start,
+      // if the size of the file has not changed for the last 10 min, we kill the process
       if (stats.size - model.size > 0) {
-        printDebugMsg(colors.green(model.nm) + ' - OK');
+        printDebugMsg(colors.green(model.nm) + ' is alive');
 
-        modelsCurrentlyCapturing.forEach(function(m) {
-          if (m.uid == model.uid && m.pid == model.pid) {
-            m.checkAfter = getTimestamp() + 600; // 10 minutes
-            m.size = stats.size;
-          }
-        });
+        model.checkAfter = getTimestamp() + 600; // 10 minutes
+        model.size = stats.size;
       } else if (!!model.captureProcess) {
-        // we assume that onClose will do clean up for us
+        // we assume that onClose will do all clean up for us
         printErrorMsg('[' + colors.green(model.nm) + '] Process is dead');
         model.captureProcess.kill();
       } else {
@@ -410,15 +393,17 @@ function mainLoop() {
     .then(function(fileno) {
       return getOnlineModels(fileno);
     })
-    .then(function(onlineModels) {
-      return selectMyModels(onlineModels);
+    .then(function() {
+      return selectMyModels();
     })
     .then(function(myModels) {
       return Promise.all(myModels.map(createCaptureProcess));
     })
     .then(function() {
-      printDebugMsg('checkCaptureProcess');
       return Promise.all(modelsCurrentlyCapturing.map(checkCaptureProcess));
+    })
+    .then(function() {
+      models = onlineModels;
     })
     .catch(function(err) {
       printErrorMsg(err);
@@ -432,9 +417,16 @@ function mainLoop() {
     });
 }
 
+var session = bhttp.session();
+
+var models = new Array();
+var onlineModels = new Array();
 var modelsCurrentlyCapturing = new Array();
 
 var config = yaml.safeLoad(fs.readFileSync('config.yml', 'utf8'));
+
+config.port = config.port || 9080;
+config.minFileSizeMb = config.minFileSizeMb || 0;
 
 config.captureDirectory = path.resolve(config.captureDirectory);
 config.completeDirectory = path.resolve(config.completeDirectory);
@@ -453,6 +445,14 @@ mkdirp(config.completeDirectory, function(err) {
   }
 });
 
+config.includeModels = (typeof config.includeModels == 'array') ? config.includeModels : [];
+config.excludeModels = (typeof config.excludeModels == 'array') ? config.excludeModels : [];
+config.deleteModels = (typeof config.deleteModels == 'array') ? config.deleteModels : [];
+
+config.includeUids = (typeof config.includeUids == 'array') ? config.includeUids : [];
+config.excludeUids = (typeof config.excludeUids == 'array') ? config.excludeUids : [];
+config.deleteUids = (typeof config.deleteUids == 'array') ? config.deleteUids : [];
+
 // convert the list of models to the new format
 var dirty = false;
 
@@ -460,18 +460,203 @@ if (config.models.length > 0) {
   config.models = config.models.map(function(m) {
 
     if (typeof m === 'number') { // then this "simple" uid
+      m = {uid: m, include: 1};
+
       dirty = true;
-      m = {uid: m};
+    } else if (!m.mode) { // if there is no mode field this old version
+      m.mode = !m.excluded ? 1 : 0;
+      dirty = true;
     }
 
     return m;
   });
 }
 
-if (dirty) {
-  printDebugMsg('Update config.yml');
+if (dirty) { // then there were some changes in the list of models
+  printDebugMsg('Save changes in config.yml');
 
   fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
 }
 
 mainLoop();
+
+dispatcher.onGet('/', function(req, res) {
+  fs.readFile('./index.html', function(err, data) {
+    if (err) {
+      res.writeHead(404, {'Content-Type': 'text/html'});
+      res.end('Not Found');
+    } else {
+      res.writeHead(200, {'Content-Type': 'text/html'});
+      res.end(data, 'utf-8');
+    }
+  });
+});
+
+// return an array of online models
+dispatcher.onGet('/models', function(req, res) {
+  res.writeHead(200, {'Content-Type': 'application/json'});
+  res.end(JSON.stringify(models));
+});
+
+// when we include the model we only "express our intention" to do so,
+// in fact the model will be included in the config only with the next iteration of mainLoop
+dispatcher.onGet('/models/include', function(req, res) {
+  if (req.params && req.params.uid) {
+    var uid = parseInt(req.params.uid, 10);
+
+    if (!isNaN(uid)) {
+      printDebugMsg(colors.green(uid) + ' to include');
+
+      // before we include the model we check that the model is not in our "to exclude" or "to delete" lists
+      remove(req.params.nm, config.excludeUids);
+      remove(req.params.nm, config.deleteUids);
+
+      config.includeUids.push(uid);
+
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({uid: uid})); // this will be sent back to the browser
+
+      var model = _.findWhere(models, {uid: uid});
+
+      if (!_.isUndefined(model)) {
+        model.nextMode = 1;
+      }
+
+      return;
+    }
+  } else if (req.params && req.params.nm) {
+    printDebugMsg(colors.green(req.params.nm) + ' to include');
+
+    // before we include the model we check that the model is not in our "to exclude" or "to delete" lists
+    remove(req.params.nm, config.excludeModels);
+    remove(req.params.nm, config.deleteModels);
+
+    config.includeModels.push(req.params.nm);
+
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
+
+    var model = _.findWhere(models, {nm: req.params.nm});
+
+    if (!_.isUndefined(model)) {
+      model.nextMode = 1;
+    }
+
+    return;
+  }
+
+  res.writeHead(422, {'Content-Type': 'application/json'});
+  res.end(JSON.stringify({error: 'Invalid request'}));
+});
+
+// whenever we exclude the model we only "express our intention" to do so,
+// in fact the model will be exclude from config only with the next iteration of mainLoop
+dispatcher.onGet('/models/exclude', function(req, res) {
+  if (req.params && req.params.uid) {
+    var uid = parseInt(req.params.uid, 10);
+
+    if (!isNaN(uid)) {
+      printDebugMsg(colors.green(uid) + ' to exclude');
+
+      // before we exclude the model we check that the model is not in our "to include" or "to delete" lists
+      remove(req.params.nm, config.includeUids);
+      remove(req.params.nm, config.deleteUids);
+
+      config.excludeUids.push(uid);
+
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({uid: uid})); // this will be sent back to the browser
+
+      var model = _.findWhere(models, {uid: uid});
+
+      if (!_.isUndefined(model)) {
+        model.nextMode = 0;
+      }
+
+      return;
+    }
+  } else if (req.params && req.params.nm) {
+    printDebugMsg(colors.green(req.params.nm) + ' to exclude');
+
+    // before we exclude the model we check that the model is not in our "to include" or "to delete" lists
+    remove(req.params.nm, config.includeModels);
+    remove(req.params.nm, config.deleteModels);
+
+    config.excludeModels.push(req.params.nm);
+
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
+
+    var model = _.findWhere(models, {nm: req.params.nm});
+
+    if (!_.isUndefined(model)) {
+      model.nextMode = 0;
+    }
+
+    return;
+  }
+
+  res.writeHead(422, {'Content-Type': 'application/json'});
+  res.end(JSON.stringify({error: 'Invalid request'}));
+});
+
+// whenever we delete the model we only "express our intention" to do so,
+// in fact the model will be markd as "deleted" in config only with the next iteration of mainLoop
+dispatcher.onGet('/models/delete', function(req, res) {
+  if (req.params && req.params.uid) {
+    var uid = parseInt(req.params.uid, 10);
+
+    if (!isNaN(uid)) {
+      printDebugMsg(colors.green(uid) + ' to delete');
+
+      // before we exclude the model we check that the model is not in our "to include" or "to exclude" lists
+      remove(req.params.nm, config.includeUids);
+      remove(req.params.nm, config.excludeUids);
+
+      config.deleteUids.push(uid);
+
+      res.writeHead(200, {'Content-Type': 'application/json'});
+      res.end(JSON.stringify({uid: uid})); // this will be sent back to the browser
+
+      var model = _.findWhere(models, {uid: uid});
+
+      if (!_.isUndefined(model)) {
+        model.nextMode = -1;
+      }
+
+      return;
+    }
+  } else if (req.params && req.params.nm) {
+    printDebugMsg(colors.green(req.params.nm) + ' to delete');
+
+    // before we exclude the model we check that the model is not in our "to include" or "to exclude" lists
+    remove(req.params.nm, config.includeModels);
+    remove(req.params.nm, config.excludeModels);
+
+    config.deleteModels.push(req.params.nm);
+
+    res.writeHead(200, {'Content-Type': 'application/json'});
+    res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
+
+    var model = _.findWhere(models, {nm: req.params.nm});
+
+    if (!_.isUndefined(model)) {
+      model.nextMode = -1;
+    }
+
+    return;
+  }
+
+  res.writeHead(422, {'Content-Type': 'application/json'});
+  res.end(JSON.stringify({error: 'Invalid request'}));
+});
+
+dispatcher.onError(function(req, res) {
+  res.writeHead(404);
+});
+
+http.createServer(function(req, res) {
+  dispatcher.dispatch(req, res);
+}).listen(config.port, function() {
+  printMsg('Server listening on: ' + colors.green('0.0.0.0:' + config.port));
+});
