@@ -45,7 +45,7 @@ Be mindful when capturing many streams at once to have plenty of space on disk a
 
 > Note: You should edit `config.yml` file only when the script is not running, otherwise, there is a big chance that your changes will be lost.
 
-> Note: It's not recommended to edit `models` section of `config.yml`. If you want to include, exclude or delete the model consider to use of `includeModels`, `excludeModels` and `deleteModels` sections or use web interface.
+> Note: It's not recommended to edit `models` section of `config.yml`. If you want to include, exclude or delete the model consider using `includeModels`, `excludeModels` and `deleteModels` sections or use web interface.
 
 Running
 ===========
