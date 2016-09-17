@@ -20,6 +20,10 @@ Requirements
 
 [ffmpeg](https://www.ffmpeg.org/download.html)
 
+Attention
+===========
+Even thought this version of the script should be able to use an old version of `config.yml` file from previous releases you should make a backup of old `config.yml` file before pulling the code.
+
 Setup
 ===========
 
