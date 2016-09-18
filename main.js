@@ -304,7 +304,7 @@ function createCaptureProcess(model) {
             } else {
               printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
             }
-          } else if (stats.size < (config.minFileSizeMb * 1048576)) {
+          } else if (stats.size == 0 || stats.size < (config.minFileSizeMb * 1048576)) {
             fs.unlink(config.captureDirectory + '/' + filename, function(err) {
               // do nothing, shit happens
             });
