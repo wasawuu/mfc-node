@@ -98,9 +98,8 @@
               <tr ng-repeat="model in vm.models | orderBy:vm.sortType:vm.sortReverse" ng-class="{
                   'mdl-color-text--green-400 mdl-color--green-50': model.vs == -4,
                   'mdl-color-text--blue-300 mdl-color--blue-50': model.vs == -3,
-                  'mdl-color-text--grey-400 mdl-color--grey-100': model.vs == -2,
-                  'mdl-color-text--red-300 mdl-color--red-50': model.vs == -1,
-                  'mdl-color-text--grey-400 mdl-color--grey-100': model.vs > 0
+                  'mdl-color-text--grey-400 mdl-color--grey-100': (model.vs == -2 || model.vs > 0),
+                  'mdl-color-text--red-300 mdl-color--red-50': model.vs == -1
                 }">
                 <td class="mdl-data-table__cell--non-numeric">
                   <a class="mdl-color-text--blue-800" ng-click="vm.preview(model)">{{ model.nm }}</a>
@@ -118,8 +117,8 @@
                     <i class="material-icons">more_vert</i>
                   </button>
                   <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu" for="{{ 'action-list-' + model.uid }}">
-                    <li class="mdl-menu__item" ng-click="vm.includeUid(model)" ng-disabled="model.mode == 1 || model.nextMode == 1">Include</li>
-                    <li class="mdl-menu__item mdl-menu__item--full-bleed-divider" ng-click="vm.excludeUid(model)" ng-disabled="model.mode == undefined || model.mode == 0 || model.nextMode == 0">Exclude</li>
+                    <li class="mdl-menu__item" ng-click="vm.includeUid(model)" ng-disabled="model.nextMode == 1 || (model.mode == 1 && model.nextMode == undefined)">Include</li>
+                    <li class="mdl-menu__item mdl-menu__item--full-bleed-divider" ng-click="vm.excludeUid(model)" ng-disabled="model.nextMode == 0 || (model.mode == 0 && model.nextMode == undefined)">Exclude</li>
                     <li class="mdl-menu__item" ng-click="vm.deleteUid(model)" ng-disabled="model.nextMode == -1">Delete</li>
                   </ul>
                 </td>
@@ -220,6 +219,10 @@
                 return m.mode < 0; // remove deleted models
               })
               .map(function(m) {
+                if (!m.mode) {
+                  m.mode = 0; // set "default" mode for models without mode
+                }
+
                 // set our own virtual value for vs field
                 if (m.nextMode === 1) {
                   m.vs = -3; // to include
@@ -231,6 +234,7 @@
                   m.vs = -4; // capturing
                 }
 
+                // get text description of the state
                 m.state = getState(m.vs);
 
                 return m;
