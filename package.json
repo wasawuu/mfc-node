@@ -1,6 +1,6 @@
 {
 	"name": "mfc-node",
-	"version": "1.0.0",
+	"version": "1.0.1",
 	"description": "MyFreeCams Recorder",
 	"main": "main.js",
 	"scripts": {
@@ -26,7 +26,6 @@
 		"underscore": "latest",
 		"websocket": "latest",
 		"colors": "latest",
-		"httpdispatcher": "latest",
-		"material-design-icons": "latest"
+		"httpdispatcher": "latest"
 	}
 }
