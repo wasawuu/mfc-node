@@ -87,10 +87,10 @@
                 <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('vs')" ng-class="vm.sortType == 'vs' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">State</th>
                 <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.city')" ng-class="vm.sortType == 'u.city' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">City</th>
                 <th ng-click="vm.sort('m.camscore')" ng-class="vm.sortType == 'm.camscore' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Score</th>
-                <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.continent')" ng-class="vm.sortType == 'm.continent' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Continent </th>
+                <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.country')" ng-class="vm.sortType == 'u.country' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Country</th>
                 <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.missmfc')" ng-class="vm.sortType == 'm.missmfc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Miss MFC</th>
                 <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.new_model')" ng-class="vm.sortType == 'm.new_model' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">New</th>
-                <th ng-click="vm.sort('m.rank')" ng-class="vm.sortType == 'm.rank' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Rank</th>
+                <th ng-click="vm.sort('m.rc')" ng-class="vm.sortType == 'm.rc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Viewers</th>
                 <th></th>
               </tr>
             </thead>
@@ -108,10 +108,10 @@
                 <td class="mdl-data-table__cell--non-numeric">{{ model.state }}</td>
                 <td class="mdl-data-table__cell--non-numeric">{{ model.u.city | limitTo:20 }}{{ model.u.city.length > 20 ? ' …' : '' }}</td>
                 <td>{{ model.m.camscore }}</td>
-                <td class="mdl-data-table__cell--non-numeric">{{ model.m.continent }}</td>
+                <td class="mdl-data-table__cell--non-numeric">{{ model.u.country | limitTo:20 }}{{ model.u.country.length > 20 ? ' …' : '' }}
                 <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500">{{ model.m.missmfc ? 'star' : '' }}</i></td>
                 <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500">{{ model.m.new_model ? 'new_releases' : '' }}</i></td>
-                <td>{{ model.m.rank }}</td>
+                <td>{{ model.m.rc }}</td>
                 <td>
                   <button id="{{ 'action-list-' + model.uid }}" class="mdl-button mdl-js-button mdl-button--icon">
                     <i class="material-icons">more_vert</i>
