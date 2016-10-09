@@ -146,8 +146,6 @@ function selectMyModels() {
     .try(function() {
       printDebugMsg(config.models.length + ' model(s) in config');
 
-      var dirty = false;
-
       // to include the model only knowing her name, we need to know her uid,
       // if we could not find model's uid in array of online models we skip this model till the next iteration
       config.includeModels = _.filter(config.includeModels, function(nm) {
@@ -241,6 +239,8 @@ function selectMyModels() {
         printDebugMsg('Save changes in config.yml');
 
         fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
+
+        dirty = false;
       }
 
       return myModels;
@@ -476,6 +476,8 @@ if (dirty) { // then there were some changes in the list of models
   printDebugMsg('Save changes in config.yml');
 
   fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
+
+  dirty = false;
 }
 
 mainLoop();
@@ -533,6 +535,8 @@ dispatcher.onGet('/models/include', function(req, res) {
 
     config.includeModels.push(req.params.nm);
 
+    dirty = true;
+
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
 
@@ -584,6 +588,8 @@ dispatcher.onGet('/models/exclude', function(req, res) {
 
     config.excludeModels.push(req.params.nm);
 
+    dirty = true;
+
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
 
@@ -634,6 +640,8 @@ dispatcher.onGet('/models/delete', function(req, res) {
     remove(req.params.nm, config.excludeModels);
 
     config.deleteModels.push(req.params.nm);
+
+    dirty = true;
 
     res.writeHead(200, {'Content-Type': 'application/json'});
     res.end(JSON.stringify({nm: req.params.nm})); // this will be sent back to the browser
