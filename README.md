@@ -42,7 +42,7 @@ Running
 	* __Exclude__ - if you don't want to record the model anymore
 	* __Delete__ - if you are not interested in the model and wanna hide her permanently
 
-> Note: This is not real-time application. Whenever your __include__, __exclude__ or __delete__ the model your changes will be applied only with the next iteration of `mainLoop` function of the script. `mainLoop` runs every 30 seconds (default value for `modelScanInterval`).
+> Note: This is not a real-time application. Whenever your __include__, __exclude__ or __delete__ the model your changes will be applied only with the next iteration of `mainLoop` function of the script. `mainLoop` runs every 30 seconds (default value for `modelScanInterval`).
 
 > Note: There is no __auto reload__ feature, you have to reload the list manually (__big red button__), however, keep in mind the script updates the list internally every 30 seconds (`modelScanInterval`), therefore sometimes you'll have to wait 30 seconds to see your updates.
 
@@ -51,5 +51,25 @@ Running
 Converting
 ===========
 
-There is a simple script to convert `.ts` files. Just edit `convert.yml` file and set proper values for `srcDirectory` (should be the same with `completeDirectory`) and `dstDirectory`, and run `node convert.js` in separate console window.
+There is a simple script to convert `.ts` files. Just edit `convert.yml` file and set proper values for `srcDirectory` (should be the same with `completeDirectory`) and `dstDirectory`, and run `node convert.js` in a separate console window.
+
+For advanced users
+===========
+
+There are several special URLs that allow implementing some operations with a model even if she is offline.
+
+__Include__
+
+`http://localhost:9080/models/include?nm=modelname`
+`http://localhost:9080/models/include?uid=12345678`
+
+__Exclude__
+
+`http://localhost:9080/models/exclude?nm=modelname`
+`http://localhost:9080/models/exclude?uid=12345678`
+
+__Delete__
+
+`http://localhost:9080/models/delete?nm=modelname`
+`http://localhost:9080/models/delete?uid=12345678`
 

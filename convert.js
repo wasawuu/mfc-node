@@ -99,7 +99,7 @@ function convertFile(srcFile) {
     return ;
   }
 
-  printMsg('Converting ' + srcFile + ' into ' + dstFile);
+  printMsg('Converting ' + srcFile + ' to ' + dstFile);
 
   var convertProcess = childProcess.spawnSync('ffmpeg', spawnArguments);
 
