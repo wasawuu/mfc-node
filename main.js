@@ -259,7 +259,7 @@ function createCaptureProcess(model) {
 
   return Promise
     .try(function() {
-      var filename = model.nm + '_' + getCurrentDateTime() + '.ts';
+      var filename = model.nm + '-' + getCurrentDateTime() + '.ts';
 
       var spawnArguments = [
         '-hide_banner',

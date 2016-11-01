@@ -3,7 +3,7 @@ completeDirectory: ./complete
 modelScanInterval: 30
 minFileSizeMb: 10
 port: 9080
-debug: true
+debug: false
 models: []
 includeModels: []
 includeUids: []
