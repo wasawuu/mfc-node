@@ -26,6 +26,6 @@
 		"underscore": "latest",
 		"websocket": "latest",
 		"colors": "latest",
-		"httpdispatcher": "latest"
+		"httpdispatcher": "^2.0.0"
 	}
 }

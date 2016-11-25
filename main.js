@@ -11,8 +11,9 @@ var colors = require('colors');
 var _ = require('underscore');
 var childProcess = require('child_process');
 var path = require('path');
-var dispatcher = require('httpdispatcher');
+var HttpDispatcher = require('httpdispatcher');
 var http = require('http');
+var dispatcher = new HttpDispatcher();
 
 function getCurrentDateTime() {
   return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
