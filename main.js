@@ -446,13 +446,13 @@ mkdirp(config.completeDirectory, function(err) {
   }
 });
 
-config.includeModels = (typeof config.includeModels == 'array') ? config.includeModels : [];
-config.excludeModels = (typeof config.excludeModels == 'array') ? config.excludeModels : [];
-config.deleteModels = (typeof config.deleteModels == 'array') ? config.deleteModels : [];
+config.includeModels = Array.isArray(config.includeModels) ? config.includeModels : [];
+config.excludeModels = Array.isArray(config.excludeModels) ? config.excludeModels : [];
+config.deleteModels = Array.isArray(config.deleteModels) ? config.deleteModels : [];
 
-config.includeUids = (typeof config.includeUids == 'array') ? config.includeUids : [];
-config.excludeUids = (typeof config.excludeUids == 'array') ? config.excludeUids : [];
-config.deleteUids = (typeof config.deleteUids == 'array') ? config.deleteUids : [];
+config.includeUids = Array.isArray(config.includeUids) ? config.includeUids : [];
+config.excludeUids = Array.isArray(config.excludeUids) ? config.excludeUids : [];
+config.deleteUids = Array.isArray(config.deleteUids) ? config.deleteUids : [];
 
 // convert the list of models to the new format
 var dirty = false;
@@ -464,7 +464,7 @@ if (config.models.length > 0) {
       m = {uid: m, include: 1};
 
       dirty = true;
-    } else if (!m.mode) { // if there is no mode field this old version
+    } else if (_.isUndefined(m.mode)) { // if there is no mode field this old version
       m.mode = !m.excluded ? 1 : 0;
       dirty = true;
     }
