@@ -1,6 +1,7 @@
 'use strict';
 var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
+var mv = require('mv');
 var S = require('string');
 var yaml = require('js-yaml');
 var colors = require('colors');
@@ -118,14 +119,14 @@ function convertFile(srcFile) {
       // do nothing, shit happens
     });
   } else {
-    fs.rename(config.srcDirectory + '/' + srcFile, config.dstDirectory + '/' + srcFile, function(err) {
+    mv(config.srcDirectory + '/' + srcFile, config.dstDirectory + '/' + srcFile, function(err) {
       if (err) {
         printErrorMsg(err.toString());
       }
     });
   }
 
-  fs.rename(config.srcDirectory + '/' + dstFile, config.dstDirectory + '/' + dstFile, function(err) {
+  mv(config.srcDirectory + '/' + dstFile, config.dstDirectory + '/' + dstFile, function(err) {
     if (err) {
       printErrorMsg(err.toString());
     }
