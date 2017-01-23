@@ -1,6 +1,7 @@
 'use strict';
 var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
+var mv = require('mv');
 var yaml = require('js-yaml');
 var moment = require('moment');
 var mkdirp = require('mkdirp');
@@ -310,7 +311,7 @@ function createCaptureProcess(model) {
               // do nothing, shit happens
             });
           } else {
-            fs.rename(config.captureDirectory + '/' + filename, config.completeDirectory + '/' + filename, function(err) {
+            mv(config.captureDirectory + '/' + filename, config.completeDirectory + '/' + filename, function(err) {
               if (err) {
                 printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
               }
