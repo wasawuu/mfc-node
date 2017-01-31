@@ -172,7 +172,7 @@ function selectMyModels() {
         dirty = true;
       });
 
-      config.deleteModels = _.reject(config.deleteModels, function(nm) {
+      config.deleteModels = _.filter(config.deleteModels, function(nm) {
         var uid = getUid(nm);
 
         if (uid === false) {
