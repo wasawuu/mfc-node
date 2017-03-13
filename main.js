@@ -2,6 +2,7 @@
 
 var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
+var mv = require('mv');
 var moment = require('moment');
 var colors = require('colors');
 var mkdirp = require('mkdirp');
@@ -124,7 +125,23 @@ function getOnlineModels(fileno) {
 
       for (let key in data) {
         if (data.hasOwnProperty(key) && typeof data[key].nm !== 'undefined' && typeof data[key].uid !== 'undefined') {
-          onlineModels.push(data[key]);
+          onlineModels.push({
+            m: {
+              camscore: data[key].m.camscore,
+              missmfc: data[key].m.missmfc,
+              new_model: data[key].m.new_model,
+              rc: data[key].m.rc
+            },
+            nm: data[key].nm,
+            u: {
+              age: data[key].u.age,
+              camserv: data[key].u.camserv,
+              city: data[key].u.city,
+              country: data[key].u.country
+            },
+            uid: data[key].uid,
+            vs: data[key].vs
+          });
         }
       }
 
@@ -285,7 +302,7 @@ function createCaptureProcess(myModel) {
               // do nothing, shit happens
             });
           } else {
-            fs.rename(captureDirectory + '/' + filename, completeDirectory + '/' + filename, (e) => {
+            mv(captureDirectory + '/' + filename, completeDirectory + '/' + filename, (e) => {
               if (e) {
                 printErrorMsg('[' + colors.green(myModel.nm) + '] ' + e.toString());
               }
