@@ -6,10 +6,10 @@
     "jquery": true
   },
   "globals": {
-  	"_": true,
-  	"hljs": true,
-  	"google": true,
-  	"angular": true
+    "_": true,
+    "hljs": true,
+    "google": true,
+    "angular": true
   },
   "rules": {
     "quotes": [2, "single"],
@@ -18,25 +18,25 @@
     "max-len": 0,
     "wrap-iife": [2, "inside"],
     "dot-notation": [2, {
-    	"allowKeywords": true,
-    	"allowPattern": "^(delete|finally)$"
+      "allowKeywords": true,
+      "allowPattern": "^(delete|finally)$"
     }],
     "no-param-reassign": [2, {
-    	"props": false }
-   	],
+      "props": false }
+    ],
     "no-mixed-operators": [2, {
-        "groups": []
+      "groups": []
     }],
     "no-unused-vars": [2, {
-        "args": "none"
+      "args": "none"
     }],
     "vars-on-top": 0,
     "no-use-before-define": [2, {
-    	"functions": true,
-    	"classes": true
+      "functions": true,
+      "classes": true
     }],
-	"no-underscore-dangle": [2, {
-		"allow": ["_id"]
-	}]
+    "no-underscore-dangle": [2, {
+      "allow": ["_id"]
+    }]
   }
 }
