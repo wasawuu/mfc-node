@@ -91,13 +91,14 @@ function getFileno() {
 
       connection.on('message', function(message) {
         if (message.type === 'utf8') {
-          var parts = /\{%22fileno%22:%22([0-9_]*)%22\}/.exec(message.utf8Data);
+          var parts = /%22opts%22:([0-9_]*),%22respkey%22:([0-9_]*),%22serv%22:([0-9_]*),%22type%22:([0-9_]*)\}/.exec(message.utf8Data);
 
-          if (parts && parts[1]) {
-            printDebugMsg('fileno = ' + parts[1]);
+          if (parts && parts[1] && parts[2] && parts[3] && parts[4]) {
+            var a = `respkey=${parts[2]}&type=${parts[4]}&opts=${parts[1]}&serv=${parts[3]}&`;
+            printDebugMsg(a);
 
             connection.close();
-            resolve(parts[1]);
+            resolve(a);
           }
         }
       });
@@ -111,7 +112,7 @@ function getFileno() {
 }
 
 function getOnlineModels(fileno) {
-  var url = 'http://www.myfreecams.com/mfc2/php/mobj.php?f=' + fileno + '&s=xchat20';
+  var url = 'http://www.myfreecams.com/php/FcwExtResp.php?' + fileno;
 
   printDebugMsg(url);
 
@@ -120,22 +121,35 @@ function getOnlineModels(fileno) {
       return session.get(url);
     })
     .then(function(response) {
-      try {
-        var rawHTML = response.body.toString('utf8');
-        rawHTML = rawHTML.substring(rawHTML.indexOf('{'), rawHTML.indexOf('\n') - 1);
-        rawHTML = rawHTML.replace(/[^\x20-\x7E]+/g, '');
-
-        var data = JSON.parse(rawHTML);
-      } catch (err) {
-        throw new Error('Failed to parse data');
-      }
-
       onlineModels = [];
 
-      for (var key in data) {
-        if (data.hasOwnProperty(key) && typeof data[key].nm != 'undefined' && typeof data[key].uid != 'undefined') {
-          onlineModels.push(data[key]);
+      try {
+        var data = JSON.parse(response.body.toString('utf8'));
+        var m;
+
+        for (var i = 1; i < data.rdata.length; i += 1) {
+          m = data.rdata[i];
+
+          onlineModels.push({
+            m: {
+              camscore: m[14],
+              missmfc: 0,
+              new_model: m[17],
+              rc: m[19]
+            },
+            nm: m[0],
+            u: {
+              age: '',
+              camserv: m[6],
+              city: '',
+              country: ''
+            },
+            uid: m[2],
+            vs: m[3]
+          });
         }
+      } catch (err) {
+        throw new Error('Failed to parse data');
       }
 
       printMsg(onlineModels.length  + ' model(s) online');
