@@ -91,14 +91,11 @@ function getFileno() {
 
       connection.on('message', function(message) {
         if (message.type === 'utf8') {
-          var parts = /%22opts%22:([0-9_]*),%22respkey%22:([0-9_]*),%22serv%22:([0-9_]*),%22type%22:([0-9_]*)\}/.exec(message.utf8Data);
+          var parts = /%22opts%22:([0-9]*),%22respkey%22:([0-9]*),%22serv%22:([0-9]*),%22type%22:([0-9]*)\}/.exec(message.utf8Data);
 
           if (parts && parts[1] && parts[2] && parts[3] && parts[4]) {
-            var a = `respkey=${parts[2]}&type=${parts[4]}&opts=${parts[1]}&serv=${parts[3]}&`;
-            printDebugMsg(a);
-
             connection.close();
-            resolve(a);
+            resolve(`respkey=${parts[2]}&type=${parts[4]}&opts=${parts[1]}&serv=${parts[3]}&`);
           }
         }
       });
@@ -131,21 +128,14 @@ function getOnlineModels(fileno) {
           m = data.rdata[i];
 
           onlineModels.push({
-            m: {
-              camscore: m[14],
-              missmfc: 0,
-              new_model: m[17],
-              rc: m[19]
-            },
             nm: m[0],
-            u: {
-              age: '',
-              camserv: m[6],
-              city: '',
-              country: ''
-            },
             uid: m[2],
-            vs: m[3]
+            vs: m[3],
+            camserv: m[6],
+            camscore: m[14],
+            continent: m[15],
+            new_model: m[17],
+            rc: m[19]
           });
         }
       } catch (err) {
@@ -254,7 +244,7 @@ function selectMyModels() {
       if (dirty) {
         printDebugMsg('Save changes in config.yml');
 
-        fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
+        fs.writeFileSync('config.yml', yaml.safeDump(config), 'utf8');
 
         dirty = false;
       }
@@ -282,8 +272,8 @@ function createCaptureProcess(model) {
         '-v',
         'fatal',
         '-i',
-        'http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490',
-        // 'http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/mfc_' + (100000000 + model.uid) + '.f4v_aac/playlist.m3u8?nc=1423603882490',
+        'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490',
+        // 'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/mfc_' + (100000000 + model.uid) + '.f4v_aac/playlist.m3u8?nc=1423603882490',
         '-c',
         'copy',
         config.captureDirectory + '/' + filename
@@ -292,11 +282,11 @@ function createCaptureProcess(model) {
       var captureProcess = childProcess.spawn('ffmpeg', spawnArguments);
 
       captureProcess.stdout.on('data', function(data) {
-        printMsg(data.toString);
+        printMsg(data.toString());
       });
 
       captureProcess.stderr.on('data', function(data) {
-        printMsg(data.toString);
+        printMsg(data.toString());
       });
 
       captureProcess.on('close', function(code) {
@@ -491,7 +481,7 @@ if (config.models.length > 0) {
 if (dirty) { // then there were some changes in the list of models
   printDebugMsg('Save changes in config.yml');
 
-  fs.writeFileSync('config.yml', yaml.safeDump(config), 0, 'utf8');
+  fs.writeFileSync('config.yml', yaml.safeDump(config), 'utf8');
 
   dirty = false;
 }

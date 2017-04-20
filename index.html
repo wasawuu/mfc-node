@@ -90,56 +90,45 @@
       </div>
     </header>
     <main class="mdl-layout__content">
-<!--       <div class="mdl-grid">
-        <div class="mdl-cell mdl-cell--12-col" style="overflow: auto"> -->
-
-          <div class="padding"></div>
-          <div class="table">
-            <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
-              <thead>
-                <tr>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('nm')" ng-class="vm.sortType == 'nm' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Name</th>
-                  <th ng-click="vm.sort('u.age')" ng-class="vm.sortType == 'u.age' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Age</th>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('vs')" ng-class="vm.sortType == 'vs' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">State</th>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.city')" ng-class="vm.sortType == 'u.city' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">City</th>
-                  <th ng-click="vm.sort('m.camscore')" ng-class="vm.sortType == 'm.camscore' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Score</th>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.country')" ng-class="vm.sortType == 'u.country' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Country</th>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.missmfc')" ng-class="vm.sortType == 'm.missmfc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Miss MFC</th>
-                  <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.new_model')" ng-class="vm.sortType == 'm.new_model' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">New</th>
-                  <th ng-click="vm.sort('m.rc')" ng-class="vm.sortType == 'm.rc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Viewers</th>
-                  <th></th>
-                </tr>
-              </thead>
-              <tbody>
-                <tr ng-repeat="model in vm.models | orderBy:vm.sortType:vm.sortReverse" ng-class="vm.rowColor(model.vs)">
-                  <td class="mdl-data-table__cell--non-numeric">
-                    <a class="mdl-color-text--blue-800" ng-click="vm.preview(model)" ng-bind="model.nm"></a>
-                  </td>
-                  <td ng-bind="model.u.age"></td>
-                  <td class="mdl-data-table__cell--non-numeric" ng-bind="model.state"></td>
-                  <td class="mdl-data-table__cell--non-numeric" ng-bind="model.u.city"></td>
-                  <td ng-bind="model.m.camscore"></td>
-                  <td class="mdl-data-table__cell--non-numeric" ng-bind="model.u.country"></td>
-                  <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500" ng-bind="model.m.missmfc"></i></td>
-                  <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="model.m.new_model"></i></td>
-                  <td ng-bind="model.m.rc"></td>
-                  <td>
-                    <button id="{{ 'action-list-' + model.uid }}" class="mdl-button mdl-js-button mdl-button--icon">
-                      <i class="material-icons">more_vert</i>
-                    </button>
-                    <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu" for="{{ 'action-list-' + model.uid }}">
-                      <li class="mdl-menu__item" ng-click="vm.includeUid(model)" ng-disabled="vm.includeDisabled(model)">Include</li>
-                      <li class="mdl-menu__item mdl-menu__item--full-bleed-divider" ng-click="vm.excludeUid(model)" ng-disabled="vm.excludeDisabled(model)">Exclude</li>
-                      <li class="mdl-menu__item" ng-click="vm.deleteUid(model)" ng-disabled="model.nextMode == -1">Delete</li>
-                    </ul>
-                  </td>
-                </tr>
-              </tbody>
-            </table>
-          </div>
-          <div class="padding"></div>
-<!--         </div>
-      </div> -->
+      <div class="padding"></div>
+      <div class="table">
+        <table class="mdl-data-table mdl-js-data-table mdl-shadow--2dp">
+          <thead>
+            <tr>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('nm')" ng-class="vm.sortType == 'nm' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Name</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('vs')" ng-class="vm.sortType == 'vs' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">State</th>
+              <th ng-click="vm.sort('camscore')" ng-class="vm.sortType == 'camscore' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Score</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('continent')" ng-class="vm.sortType == 'continent' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Continent</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('new_model')" ng-class="vm.sortType == 'new_model' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">New</th>
+              <th ng-click="vm.sort('rc')" ng-class="vm.sortType == 'rc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Viewers</th>
+              <th></th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr ng-repeat="model in vm.models | orderBy:vm.sortType:vm.sortReverse" ng-class="vm.rowColor(model.vs)">
+              <td class="mdl-data-table__cell--non-numeric">
+                <a class="mdl-color-text--blue-800" ng-click="vm.preview(model)" ng-bind="model.nm"></a>
+              </td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.state"></td>
+              <td ng-bind="model.camscore"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.continent"></td>
+              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="model.new_model"></i></td>
+              <td ng-bind="model.rc"></td>
+              <td>
+                <button id="{{ 'action-list-' + model.uid }}" class="mdl-button mdl-js-button mdl-button--icon">
+                  <i class="material-icons">more_vert</i>
+                </button>
+                <ul class="mdl-menu mdl-menu--bottom-right mdl-js-menu" for="{{ 'action-list-' + model.uid }}">
+                  <li class="mdl-menu__item" ng-click="vm.includeUid(model)" ng-disabled="vm.includeDisabled(model)">Include</li>
+                  <li class="mdl-menu__item mdl-menu__item--full-bleed-divider" ng-click="vm.excludeUid(model)" ng-disabled="vm.excludeDisabled(model)">Exclude</li>
+                  <li class="mdl-menu__item" ng-click="vm.deleteUid(model)" ng-disabled="model.nextMode == -1">Delete</li>
+                </ul>
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="padding"></div>
     </main>
   </div>
 
@@ -220,7 +209,7 @@
       };
 
       vm.preview = function(model) {
-        console.log('http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490');
+        console.log('http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490');
 
         var url = 'https://www.myfreecams.com/#' + model.nm;
         window.open(url, '_blank');
@@ -268,16 +257,11 @@
                 // get text description of the state
                 m.state = getState(m.vs);
 
-                if (m.u.city && m.u.city.length > 20) {
-                  m.u.city = m.u.city.substr(0, 19) + '…';
+                if (m.continent && m.continent.length > 20) {
+                  m.continent = m.continent.substr(0, 19) + '…';
                 }
 
-                if (m.u.country && m.u.country.length > 20) {
-                  m.u.country = m.u.country.substr(0, 19) + '…';
-                }
-
-                m.m.missmfc = m.m.missmfc ? 'star' : '';
-                m.m.new_model = m.m.new_model ? 'new_releases' : '';
+                m.new_model = m.new_model ? 'new_releases' : '';
 
                 return m;
               });
