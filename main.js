@@ -358,7 +358,7 @@ function addInQueue(req, res) {
 
     config.queue.push(model);
 
-    let localModel = _.findWhere(cachedModels, model);
+    let localModel = _.findWhere(cachedModels, !model.uid ? { nm: model.nm } : { uid: model.uid });
 
     if (localModel !== undefined) {
       localModel.nextMode = mode;
