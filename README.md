@@ -11,7 +11,7 @@ This is an attempt to create a script similar to [capturbate-node](https://githu
 
 Credits:
 * [capturbate-node](https://github.com/sstativa/capturebate-node)
-* [Sembiance/get_mfc_video_url.js](https://gist.github.com/Sembiance/df151de0006a0bf8ae54)
+* [MFCAuto](https://github.com/ZombieAlex/MFCAuto)
 
 Requirements
 ==========
