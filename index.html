@@ -102,14 +102,14 @@
           <thead>
             <tr>
               <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('nm')" ng-class="vm.sortType == 'nm' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Name</th>
-              <th ng-click="vm.sort('u.age')" ng-class="vm.sortType == 'u.age' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Age</th>
+              <th ng-click="vm.sort('age')" ng-class="vm.sortType == 'age' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Age</th>
               <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('vs')" ng-class="vm.sortType == 'vs' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">State</th>
-              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.city')" ng-class="vm.sortType == 'u.city' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">City</th>
-              <th ng-click="vm.sort('m.camscore')" ng-class="vm.sortType == 'm.camscore' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Score</th>
-              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('u.country')" ng-class="vm.sortType == 'u.country' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Country</th>
-              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.missmfc')" ng-class="vm.sortType == 'm.missmfc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Miss MFC</th>
-              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('m.new_model')" ng-class="vm.sortType == 'm.new_model' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">New</th>
-              <th ng-click="vm.sort('m.rc')" ng-class="vm.sortType == 'm.rc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Viewers</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('city')" ng-class="vm.sortType == 'city' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">City</th>
+              <th ng-click="vm.sort('camscore')" ng-class="vm.sortType == 'camscore' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Score</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('country')" ng-class="vm.sortType == 'country' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Contry</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('missmfc')" ng-class="vm.sortType == 'missmfc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Miss MFC</th>
+              <th class="mdl-data-table__cell--non-numeric" ng-click="vm.sort('new_model')" ng-class="vm.sortType == 'new_model' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">New</th>
+              <th ng-click="vm.sort('rc')" ng-class="vm.sortType == 'rc' ? ('mdl-data-table__header--sorted-' + (vm.sortReverse ? 'ascending' : 'descending') ) : ''">Viewers</th>
               <th></th>
             </tr>
           </thead>
@@ -118,14 +118,14 @@
               <td class="mdl-data-table__cell--non-numeric">
                 <a class="mdl-color-text--blue-800" target="_blank" ng-href="https://www.myfreecams.com/#{{ model.nm }}" ng-click="vm.log(model)" ng-bind="model.nm"></a>
               </td>
-              <td ng-bind="model.u.age"></td>
+              <td ng-bind="model.age"></td>
               <td class="mdl-data-table__cell--non-numeric" ng-bind="model.state"></td>
-              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.u.city"></td>
-              <td ng-bind="model.m.camscore"></td>
-              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.u.country"></td>
-              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500" ng-bind="model.m.missmfc"></i></td>
-              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="model.m.new_model"></i></td>
-              <td ng-bind="model.m.rc"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.city"></td>
+              <td ng-bind="model.camscore"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.country"></td>
+              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500" ng-bind="model.missmfc"></i></td>
+              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="model.new_model"></i></td>
+              <td ng-bind="model.rc"></td>
               <td>
                 <button id="{{ 'action-list-' + model.uid }}" class="mdl-button mdl-js-button mdl-button--icon">
                   <i class="material-icons">more_vert</i>
@@ -134,6 +134,7 @@
                   <li class="mdl-menu__item" ng-click="vm.includeUid(model)" ng-disabled="model.incDisabled">Include</li>
                   <li class="mdl-menu__item mdl-menu__item--full-bleed-divider" ng-click="vm.excludeUid(model)" ng-disabled="model.excDisabled">Exclude</li>
                   <li class="mdl-menu__item" ng-click="vm.deleteUid(model)" ng-disabled="model.delDisabled">Delete</li>
+                  <!-- <li class="mdl-menu__item" ng-click="vm.dump(model)" ng-disabled="model.delDisabled">Dump</li> -->
                 </ul>
               </td>
             </tr>
@@ -237,9 +238,9 @@
         });
       };
 
-      // vm.preview = function (model) {
-      //   console.log('http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490');
-      // };
+      vm.dump = function (model) {
+      	console.log(model);
+      };
 
       vm.refresh = function () {
         vm.ready = false;
@@ -250,16 +251,18 @@
             vm.models = response.data.map(function (m) {
               vm.setVs(m);
 
-              if (m.u.city && m.u.city.length > 20) {
-                m.u.city = m.u.city.substr(0, 19) + '…';
+              if (m.city && m.city.length > 20) {
+                m.city = m.city.substr(0, 19) + '…';
               }
 
-              if (m.u.country && m.u.country.length > 20) {
-                m.u.country = m.u.country.substr(0, 19) + '…';
+              if (m.country && m.country.length > 20) {
+                m.country = m.country.substr(0, 19) + '…';
               }
 
-              m.m.missmfc = m.m.missmfc ? 'star' : '';
-              m.m.new_model = m.m.new_model ? 'new_releases' : '';
+              m.missmfc = m.missmfc ? 'star' : '';
+              m.new_model = m.new_model ? 'new_releases' : '';
+
+              m.rc = m.rc || 0;
 
               return m;
             });

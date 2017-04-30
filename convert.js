@@ -10,9 +10,10 @@ var mkdirp = require('mkdirp');
 var path = require('path');
 var moment = require('moment');
 var _ = require('underscore');
+var Queue = require('promise-queue');
 
 function getCurrentDateTime() {
-  return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
+  return moment().format('MM/DD/YYYY - HH:mm:ss'); // The only true way of writing out dates and times, ISO 8601
 }
 
 function printMsg(msg) {
@@ -23,16 +24,16 @@ function printErrorMsg(msg) {
   console.log(colors.blue(`[${getCurrentDateTime()}]`), colors.red('[ERROR]'), msg);
 }
 
-function getTimestamp() {
-  return Math.floor(new Date().getTime() / 1000);
-}
-
-var startTs;
 var config = yaml.safeLoad(fs.readFileSync('convert.yml', 'utf8'));
 
 var srcDirectory = path.resolve(config.srcDirectory || './complete');
 var dstDirectory = path.resolve(config.dstDirectory || './converted');
 var dirScanInterval = config.dirScanInterval || 300;
+var maxConcur = config.maxConcur || 1;
+
+Queue.configure(Promise.Promise);
+
+var queue = new Queue(maxConcur, Infinity);
 
 mkdirp.sync(srcDirectory);
 mkdirp.sync(dstDirectory);
@@ -43,114 +44,124 @@ function getFiles() {
     .then(files => _.filter(files, file => string(file).endsWith('.ts') || string(file).endsWith('.flv')));
 }
 
+function getTsSpawnArguments(srcFile, dstFile) {
+  return [
+    '-i',
+    srcDirectory + '/' + srcFile,
+    '-y',
+    '-hide_banner',
+    '-loglevel',
+    'panic',
+    '-c:v',
+    'copy',
+    '-c:a',
+    'copy',
+    '-bsf:a',
+    'aac_adtstoasc',
+    '-copyts',
+    dstDirectory + '/~' + dstFile
+  ];
+}
+
+function getFlvSpawnArguments(srcFile, dstFile) {
+  return [
+    '-i',
+    srcDirectory + '/' + srcFile,
+    '-y',
+    '-hide_banner',
+    '-loglevel',
+    'panic',
+    '-movflags',
+    '+faststart',
+    '-c:v',
+    'copy',
+    '-strict',
+    '-2',
+    '-q:a',
+    '100',
+    dstDirectory + '/~' + dstFile
+  ];
+}
+
 function convertFile(srcFile) {
-  var dstFile;
-  var spawnArguments;
+  return new Promise((resolve, reject) => {
+    var dstFile;
+    var spawnArguments;
 
-  if (string(srcFile).endsWith('.ts')) {
-    dstFile = string(srcFile).chompRight('ts').s + 'mp4';
-
-    spawnArguments = [
-      '-i',
-      srcDirectory + '/' + srcFile,
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'panic',
-      '-c:v',
-      'copy',
-      '-c:a',
-      'copy',
-      '-bsf:a',
-      'aac_adtstoasc',
-      '-copyts',
-      srcDirectory + '/' + dstFile
-    ];
-  } else if (string(srcFile).endsWith('.flv')) {
-    dstFile = string(srcFile).chompRight('flv').s + 'mp4';
-
-    spawnArguments = [
-      '-i',
-      srcDirectory + '/' + srcFile,
-      '-y',
-      '-hide_banner',
-      '-loglevel',
-      'panic',
-      '-movflags',
-      '+faststart',
-      '-c:v',
-      'copy',
-      '-strict',
-      '-2',
-      '-q:a',
-      '100',
-      srcDirectory + '/' + dstFile
-    ];
-  }
-
-  if (!dstFile) {
-    printErrorMsg(`Failed to convert ${srcFile}`);
-
-    return;
-  }
-
-  printMsg(`Converting ${srcFile} to ${dstFile}`);
-
-  var convertProcess = childProcess.spawnSync('ffmpeg', spawnArguments);
-
-  if (convertProcess.status !== 0) {
-    printErrorMsg(`Failed to convert ${srcFile}`);
-
-    if (convertProcess.error) {
-      printErrorMsg(convertProcess.error.toString());
+    if (string(srcFile).endsWith('.ts')) {
+      dstFile = string(srcFile).chompRight('ts').s + 'mp4';
+      spawnArguments = getTsSpawnArguments(srcFile, dstFile);
+    } else {
+      dstFile = string(srcFile).chompRight('flv').s + 'mp4';
+      spawnArguments = getFlvSpawnArguments(srcFile, dstFile);
     }
 
-    return;
-  }
 
-  if (config.deleteAfter) {
-    fs.unlink(srcDirectory + '/' + srcFile, (err) => {
-      // do nothing, shit happens
-    });
-  } else {
-    fs.rename(srcDirectory + '/' + srcFile, dstDirectory + '/' + srcFile, (err) => {
-      if (err) {
-        printErrorMsg(err.toString());
+    printMsg(`${colors.green(srcFile)} started`);
+
+    var convertProcess = childProcess.spawn('ffmpeg', spawnArguments);
+
+    convertProcess.on('close', status => {
+      if (status !== 0) {
+        reject(`Failed to convert ${srcFile}`);
+      } else {
+        Promise.try(() => {
+          return config.deleteAfter
+            ? fs.unlinkAsync(srcDirectory + '/' + srcFile)
+            : fs.renameAsync(srcDirectory + '/' + srcFile, srcDirectory + '/' + srcFile + '.bak');
+        })
+        .then(() => {
+          fs.renameAsync(dstDirectory + '/~' + dstFile, dstDirectory + '/' + dstFile);
+        })
+        .then(() => {
+          resolve(srcFile);
+        })
+        .catch(err => {
+          reject(err.toString());
+        });
       }
     });
-  }
-
-  fs.rename(srcDirectory + '/' + dstFile, dstDirectory + '/' + dstFile, (err) => {
-    if (err) {
-      printErrorMsg(err.toString());
-    }
   });
 }
 
 function mainLoop() {
-  startTs = getTimestamp();
+  var startTs = moment().unix();
 
   Promise
     .try(() => getFiles())
-    .then((files) => {
-      if (files.length > 0) {
-        printMsg(files.length + ' file(s) to convert');
-        _.each(files, convertFile);
+    .then(files => new Promise((resolve, reject) => {
+      printMsg(files.length + ' file(s) to convert');
+
+      if (files.length === 0) {
+        resolve();
       } else {
-        printMsg('No files found');
+        _.each(files, file => {
+          queue
+            .add(() => convertFile(file))
+            .then(srcFile => {
+              printMsg(`${colors.green(srcFile)} finished`);
+
+              if ((queue.getPendingLength() + queue.getQueueLength()) === 0) {
+                resolve();
+              }
+            })
+            .catch(err => {
+              printErrorMsg(err);
+            });
+        });
       }
-    })
-    .catch((err) => {
+    }))
+    .catch(err => {
       printErrorMsg(err);
     })
     .finally(() => {
-      var seconds = startTs - getTimestamp() + dirScanInterval;
+      var seconds = startTs - moment().unix() + dirScanInterval;
 
       if (seconds < 5) {
         seconds = 5;
       }
 
-      printMsg('Done, will scan the folder in ' + seconds + ' second(s).');
+      printMsg('Done, will scan the folder in ' + seconds + ' seconds.');
 
       setTimeout(mainLoop, seconds * 1000);
     });
