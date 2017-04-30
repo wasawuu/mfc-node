@@ -196,7 +196,7 @@ function createRtmpCaptureProcess(myModel) {
 function createFfmpegCaptureProcess(myModel) {
   return Promise
     .try(() => {
-      var filename = myModel.nm + '-' + moment().format('YYYYMMDD-HHmmss-ts') + '.ts';
+      var filename = myModel.nm + '-' + moment().format('YYYYMMDD-HHmmss') + '.ts';
 
       var captureProcess = childProcess.spawn('ffmpeg', [
         '-hide_banner',
