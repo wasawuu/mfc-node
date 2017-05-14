@@ -17,6 +17,8 @@ var dispatcher = new HttpDispatcher();
 var http = require('http');
 var mfc = require('MFCAuto');
 
+// mfc.setLogLevel(5);
+
 var onlineModels = []; // the list of models from myfreecams.com
 var capturingModels = []; // the list of currently capturing models
 var cachedModels = [];  // "cached" copy of onlineModels (primarily for index.html)
@@ -206,6 +208,12 @@ function createFfmpegCaptureProcess(myModel) {
         `http://video${myModel.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${100000000 + myModel.uid}.f4v_mobile/playlist.m3u8?nc=1423603882490`,
         '-c',
         'copy',
+        '-vsync',
+        '2',
+        '-r',
+        '60',
+        '-b:v',
+        '500k',
         `${captureDirectory}/${filename}`
       ]);
 
@@ -395,11 +403,15 @@ var mfcClient = new mfc.Client();
 
 Promise
   .try(() => mfcClient.connectAndWaitForModels())
+  .timeout(120000) // 2 mins
   .then(() => {
     mkdir(captureDirectory);
     mkdir(completeDirectory);
 
     mainLoop();
+  })
+  .catch(err => {
+    printErrorMsg(err.toString());
   });
 
 dispatcher.onGet('/', (req, res) => {

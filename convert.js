@@ -13,15 +13,15 @@ var _ = require('underscore');
 var Queue = require('promise-queue');
 
 function getCurrentDateTime() {
-  return moment().format('MM/DD/YYYY - HH:mm:ss'); // The only true way of writing out dates and times, ISO 8601
+  return moment().format('HH:mm:ss');
 }
 
 function printMsg(msg) {
-  console.log(colors.blue(`[${getCurrentDateTime()}]`), msg);
+  console.log(`[${getCurrentDateTime()}]`, msg);
 }
 
 function printErrorMsg(msg) {
-  console.log(colors.blue(`[${getCurrentDateTime()}]`), colors.red('[ERROR]'), msg);
+  console.log(`[${getCurrentDateTime()}]`, colors.red('[ERROR]'), msg);
 }
 
 var config = yaml.safeLoad(fs.readFileSync('convert.yml', 'utf8'));
@@ -87,6 +87,7 @@ function convertFile(srcFile) {
   return new Promise((resolve, reject) => {
     var dstFile;
     var spawnArguments;
+    var startTs = moment();
 
     if (string(srcFile).endsWith('.ts')) {
       dstFile = string(srcFile).chompRight('ts').s + 'mp4';
@@ -96,8 +97,7 @@ function convertFile(srcFile) {
       spawnArguments = getFlvSpawnArguments(srcFile, dstFile);
     }
 
-
-    printMsg(`${colors.green(srcFile)} started`);
+    printMsg(`Starting ${colors.green(srcFile)}...`);
 
     var convertProcess = childProcess.spawn('ffmpeg', spawnArguments);
 
@@ -114,6 +114,10 @@ function convertFile(srcFile) {
           fs.renameAsync(dstDirectory + '/~' + dstFile, dstDirectory + '/' + dstFile);
         })
         .then(() => {
+          let duration = moment.duration(moment().diff(startTs)).asSeconds().toString() + ' s';
+
+          printMsg(`Finished ${colors.green(srcFile)} after ${colors.magenta(duration)}`);
+
           resolve(srcFile);
         })
         .catch(err => {
@@ -138,21 +142,23 @@ function mainLoop() {
         _.each(files, file => {
           queue
             .add(() => convertFile(file))
-            .then(srcFile => {
-              printMsg(`${colors.green(srcFile)} finished`);
-
+            .then(() => {
               if ((queue.getPendingLength() + queue.getQueueLength()) === 0) {
                 resolve();
               }
             })
             .catch(err => {
               printErrorMsg(err);
+
+              reject(); // ???
             });
         });
       }
     }))
     .catch(err => {
-      printErrorMsg(err);
+      if (err) {
+        printErrorMsg(err);
+      }
     })
     .finally(() => {
       var seconds = startTs - moment().unix() + dirScanInterval;
