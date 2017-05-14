@@ -272,10 +272,16 @@ function createCaptureProcess(model) {
         '-v',
         'fatal',
         '-i',
-        'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490',
+        'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8',
         // 'http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/mfc_' + (100000000 + model.uid) + '.f4v_aac/playlist.m3u8?nc=1423603882490',
         '-c',
         'copy',
+        '-vsync',
+        '2',
+        '-r',
+        '60',
+        '-b:v',
+        '500k',
         config.captureDirectory + '/' + filename
       ];
 
