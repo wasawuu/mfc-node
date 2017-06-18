@@ -15,6 +15,7 @@ var path = require('path');
 var HttpDispatcher = require('httpdispatcher');
 var http = require('http');
 var dispatcher = new HttpDispatcher();
+var xchat_servers = ["xchat20", "xchat91", "xchat81", "xchat82", "xchat83", "xchat79", "xchat68", "xchat78"];
 
 function getCurrentDateTime() {
   return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
@@ -104,7 +105,8 @@ function getFileno() {
       connection.sendUTF("1 0 0 20071025 0 guest:guest\n\0");
     });
 
-    client.connect('ws://xchat20.myfreecams.com:8080/fcsl', '', 'http://xchat20.myfreecams.com:8080', {Cookie: 'company_id=3149; guest_welcome=1; history=7411522,5375294'});
+    var xchat_server = xchat_servers[Math.floor(Math.random()*xchat_servers.length)]; // pick a random xchat server
+    client.connect('ws://'+xchat_server+'.myfreecams.com:8080/fcsl', '', 'http://'+xchat_server+'.myfreecams.com:8080', {Cookie: 'company_id=3149; guest_welcome=1; history=7411522,5375294'});
   }).timeout(30000); // 30 secs
 }
 
