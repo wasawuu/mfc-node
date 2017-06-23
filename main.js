@@ -106,6 +106,7 @@ function getFileno() {
     });
 
     var xchat_server = _.sample(xchat_servers); // pick a random xchat server
+    printDebugMsg('server: ' + xchat_server);
     client.connect(`ws://${xchat_server}.myfreecams.com:8080/fcsl`, '', `http://${xchat_server}.myfreecams.com:8080`, {Cookie: 'company_id=3149; guest_welcome=1; history=7411522,5375294'});
   }).timeout(30000); // 30 secs
 }
