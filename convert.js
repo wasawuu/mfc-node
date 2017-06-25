@@ -150,7 +150,7 @@ function mainLoop() {
             .catch(err => {
               printErrorMsg(err);
 
-              reject(); // ???
+              // reject(); // ???
             });
         });
       }
