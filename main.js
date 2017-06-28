@@ -15,7 +15,7 @@ var path = require('path');
 var HttpDispatcher = require('httpdispatcher');
 var http = require('http');
 var dispatcher = new HttpDispatcher();
-var xchat_servers = ["xchat22", "xchat23", "xchat24", "xchat25", "xchat26", "xchat27", "xchat30", "xchat31", "xchat32", "xchat33", "xchat34", "xchat35", "xchat36", "xchat39", "xchat40", "xchat41", "xchat42", "xchat43", "xchat44", "xchat45", "xchat46", "xchat47", "xchat48", "xchat49", "xchat58", "xchat59", "xchat60", "xchat61", "xchat62", "xchat63", "xchat64", "xchat65", "xchat66", "xchat67", "xchat69", "xchat70", "xchat71", "xchat72", "xchat73", "xchat74", "xchat75", "xchat90", "xchat92", "xchat93", "xchat94", "ychat30", "ychat31", "ychat32", "ychat33"];
+var xchat_servers = ["xchat22", "xchat23", "xchat24", "xchat25", "xchat26", "xchat27", "xchat30", "xchat31", "xchat32", "xchat33", "xchat34", "xchat35", "xchat36", "xchat39", "xchat40", "xchat42", "xchat44", "xchat45", "xchat46", "xchat47", "xchat48", "xchat49", "xchat58", "xchat59", "xchat60", "xchat61", "xchat62", "xchat63", "xchat64", "xchat65", "xchat66", "xchat67", "xchat69", "xchat70", "xchat71", "xchat72", "xchat73", "xchat74", "xchat75", "xchat90", "xchat92", "xchat93", "xchat94", "ychat30", "ychat31", "ychat32", "ychat33"];
 
 function getCurrentDateTime() {
   return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
