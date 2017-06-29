@@ -129,16 +129,15 @@ function getOnlineModels(fileno) {
 
         for (var i = 1; i < data.rdata.length; i += 1) {
           m = data.rdata[i];
-
           onlineModels.push({
             nm: m[0],
             uid: m[2],
             vs: m[3],
             camserv: m[6],
-            camscore: m[14],
-            continent: m[15],
-            new_model: m[17],
-            rc: m[19]
+            camscore: m[16],
+            continent: m[17],
+            new_model: m[15],
+            rc: m[20]
           });
         }
       } catch (err) {
