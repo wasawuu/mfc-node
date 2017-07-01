@@ -15,7 +15,9 @@ var path = require('path');
 var HttpDispatcher = require('httpdispatcher');
 var http = require('http');
 var dispatcher = new HttpDispatcher();
-var xchat_servers = ["xchat22", "xchat23", "xchat24", "xchat25", "xchat26", "xchat27", "xchat30", "xchat31", "xchat32", "xchat33", "xchat34", "xchat35", "xchat36", "xchat39", "xchat40", "xchat42", "xchat44", "xchat45", "xchat46", "xchat47", "xchat48", "xchat49", "xchat58", "xchat59", "xchat60", "xchat61", "xchat62", "xchat63", "xchat64", "xchat65", "xchat66", "xchat67", "xchat69", "xchat70", "xchat71", "xchat72", "xchat73", "xchat74", "xchat75", "xchat90", "xchat92", "xchat93", "xchat94", "ychat30", "ychat31", "ychat32", "ychat33"];
+var xchatServers = ["xchat22", "xchat23", "xchat24", "xchat25", "xchat26", "xchat27", "xchat30", "xchat31", "xchat32", "xchat33", "xchat34", "xchat35", "xchat36", "xchat39", "xchat40", "xchat42", "xchat44", "xchat45", "xchat46", "xchat47", "xchat48", "xchat49", "xchat58", "xchat59", "xchat60", "xchat61", "xchat62", "xchat63", "xchat64", "xchat65", "xchat66", "xchat67", "xchat69", "xchat70", "xchat71", "xchat72", "xchat73", "xchat74", "xchat75", "xchat90", "xchat92", "xchat93", "xchat94", "ychat30", "ychat31", "ychat32", "ychat33"];
+var xchatServer = _.sample(xchatServers);
+var nextScan;
 
 function getCurrentDateTime() {
   return moment().format('YYYY-MM-DDTHHmmss'); // The only true way of writing out dates and times, ISO 8601
@@ -105,9 +107,7 @@ function getFileno() {
       connection.sendUTF("1 0 0 20071025 0 guest:guest\n\0");
     });
 
-    var xchat_server = _.sample(xchat_servers); // pick a random xchat server
-    printDebugMsg('server: ' + xchat_server);
-    client.connect(`ws://${xchat_server}.myfreecams.com:8080/fcsl`, '', `http://${xchat_server}.myfreecams.com:8080`, {Cookie: 'company_id=3149; guest_welcome=1; history=7411522,5375294'});
+    client.connect(`ws://${xchatServer}.myfreecams.com:8080/fcsl`, '', `http://${xchatServer}.myfreecams.com:8080`, {Cookie: 'company_id=3149; guest_welcome=1; history=7411522,5375294'});
   }).timeout(30000); // 30 secs
 }
 
@@ -400,6 +400,8 @@ function checkCaptureProcess(model) {
 function mainLoop() {
   printDebugMsg('Start searching for new models');
 
+  nextScan = config.modelScanInterval * 1000;
+
   Promise
     .try(function() {
       return getFileno();
@@ -421,13 +423,22 @@ function mainLoop() {
     })
     .catch(function(err) {
       printErrorMsg(err);
+
+      if (err.name === 'TimeoutError') {
+          // select another server
+          xchatServer = _.sample(xchatServers);
+
+          printDebugMsg(`New server: ${xchatServer}`);
+
+          nextScan = 3000; // 3 seconds
+      }
     })
     .finally(function() {
       dumpModelsCurrentlyCapturing();
 
-      printMsg('Done, will search for new models in ' + config.modelScanInterval + ' second(s).');
+      printMsg('Done, will search for new models in ' + nextScan + ' second(s).');
 
-      setTimeout(mainLoop, config.modelScanInterval * 1000);
+      setTimeout(mainLoop, nextScan);
     });
 }
 
