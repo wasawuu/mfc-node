@@ -436,7 +436,7 @@ function mainLoop() {
     .finally(function() {
       dumpModelsCurrentlyCapturing();
 
-      printMsg('Done, will search for new models in ' + nextScan + ' second(s).');
+      printMsg('Done, will search for new models in ' + nextScan/1000 + ' second(s).');
 
       setTimeout(mainLoop, nextScan);
     });
