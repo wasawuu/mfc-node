@@ -116,16 +116,16 @@
           <tbody>
             <tr ng-repeat="model in vm.models | orderBy:vm.sortType:vm.sortReverse" ng-class="model.color">
               <td class="mdl-data-table__cell--non-numeric">
-                <a class="mdl-color-text--blue-800" target="_blank" ng-href="https://www.myfreecams.com/#{{ model.nm }}" ng-click="vm.log(model)" ng-bind="model.nm"></a>
+                <a class="mdl-color-text--blue-800" target="_blank" ng-href="https://www.myfreecams.com/#{{ model.nm }}" ng-click="vm.log(model)" ng-bind="::model.nm"></a>
               </td>
               <td ng-bind="model.age"></td>
-              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.state"></td>
-              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.city"></td>
-              <td ng-bind="model.camscore"></td>
-              <td class="mdl-data-table__cell--non-numeric" ng-bind="model.country"></td>
-              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500" ng-bind="model.missmfc"></i></td>
-              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="model.new_model"></i></td>
-              <td ng-bind="model.rc"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="::model.state"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="::model.city"></td>
+              <td ng-bind="::model.camscore"></td>
+              <td class="mdl-data-table__cell--non-numeric" ng-bind="::model.country"></td>
+              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--amber-500" ng-bind="::model.missmfc"></i></td>
+              <td class="mdl-data-table__cell--non-numeric"><i class="material-icons mdi-24 mdl-color-text--orange-500" ng-bind="::model.new_model"></i></td>
+              <td ng-bind="::model.rc"></td>
               <td>
                 <button id="{{ 'action-list-' + model.uid }}" class="mdl-button mdl-js-button mdl-button--icon">
                   <i class="material-icons">more_vert</i>
@@ -161,7 +161,7 @@
       vm.sortReverse = false;
 
       vm.log = function (model) {
-        console.log('http://video' + (model.u.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=1423603882490');
+        console.log('http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=' + Date.now());
       };
 
       vm.sort = function (sortType) {

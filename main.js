@@ -9,13 +9,12 @@ var mkdirp = require('mkdirp');
 var yaml = require('js-yaml');
 var _ = require('underscore');
 var path = require('path');
-var bhttp = require('bhttp');
-var session = bhttp.session();
 var childProcess = require('child_process');
 var HttpDispatcher = require('httpdispatcher');
 var dispatcher = new HttpDispatcher();
 var http = require('http');
 var mfc = require('MFCAuto');
+var EOL = require('os').EOL;
 
 // mfc.setLogLevel(5);
 
@@ -34,6 +33,8 @@ config.debug = config.debug || false;
 config.rtmp = config.rtmp || false;
 config.models = Array.isArray(config.models) ? config.models : [];
 config.queue = Array.isArray(config.queue) ? config.queue : [];
+config.dateFormat = config.dateFormat || 'YYYYMMDD-HHmmss';
+config.createModelDirectory = config.createModelDirectory || true;
 
 var captureDirectory = path.resolve(config.captureDirectory);
 var completeDirectory = path.resolve(config.completeDirectory);
@@ -52,16 +53,16 @@ function getCurrentDateTime() {
 }
 
 function printMsg(msg) {
-  console.log(colors.blue(`[${getCurrentDateTime()}]`), msg);
+  console.log(colors.gray(`[${getCurrentDateTime()}]`), msg);
 }
 
 function printErrorMsg(msg) {
-  console.log(colors.blue(`[${getCurrentDateTime()}]`), colors.red('[ERROR]'), msg);
+  console.log(colors.gray(`[${getCurrentDateTime()}]`), colors.red('[ERROR]'), msg);
 }
 
 function printDebugMsg(msg) {
   if (config.debug && msg) {
-    console.log(colors.blue(`[${getCurrentDateTime()}]`), colors.yellow('[DEBUG]'), msg);
+    console.log(colors.gray(`[${getCurrentDateTime()}]`), colors.yellow('[DEBUG]'), msg);
   }
 }
 
@@ -119,7 +120,7 @@ function updateConfigModels() {
       let onlineModel = _.findWhere(onlineModels, { nm: queueModel.nm });
 
       if (_.isUndefined(onlineModel)) {
-        return true;
+        return true; // keep in the queue
       }
 
       uid = onlineModel.uid;
@@ -145,7 +146,7 @@ function updateConfigModels() {
 
     printDebugMsg('Save changes in config.yml');
 
-    fs.writeFileSync('config.yml', yaml.safeDump(config), 'utf8');
+    fs.writeFileSync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8');
   }
 }
 
@@ -156,6 +157,10 @@ function selectMyModels() {
   var isDirty = false;
 
   _.each(config.models, configModel => {
+    if (configModel.mode !== 1) {
+      return;
+    }
+
     var onlineModel = _.findWhere(onlineModels, { uid: configModel.uid });
 
     // if undefined then the model is offline
@@ -163,30 +168,30 @@ function selectMyModels() {
       return; // skip the rest of the function
     }
 
-    onlineModel.mode = configModel.mode;
-
-    if (onlineModel.mode === 1) {
-      if (onlineModel.vs === 0 || onlineModel.vs === 90) { // probably 90 should be removed
-        myModels.push(onlineModel);
-      } else {
-        printMsg(`${colors.green(onlineModel.nm)} is away or in a private`);
-      }
-    }
-
     // save the name of the model in config
     if (!configModel.nm) {
       configModel.nm = onlineModel.nm;
+
       isDirty = true;
+    }
+
+    onlineModel.mode = configModel.mode;
+    onlineModel.dir_nm = configModel.nm;
+
+    if (onlineModel.vs === 0 || onlineModel.vs === 90) { // probably 90 should be removed
+      myModels.push(onlineModel);
+    } else {
+      printMsg(`${colors.green(onlineModel.nm)} is away or in a private`);
     }
   });
 
   if (isDirty) {
     printDebugMsg('Save changes in config.yml');
 
-    fs.writeFileSync('config.yml', yaml.safeDump(config), 'utf8');
+    fs.writeFileSync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8');
   }
 
-  printDebugMsg(myModels.length + ' model(s) to capture');
+  printDebugMsg(`${myModels.length} model(s) to capture`);
 
   return myModels;
 }
@@ -198,14 +203,14 @@ function createRtmpCaptureProcess(myModel) {
 function createFfmpegCaptureProcess(myModel) {
   return Promise
     .try(() => {
-      var filename = myModel.nm + '-' + moment().format('YYYYMMDD-HHmmss') + '.ts';
+      var filename = myModel.nm + '-' + moment().format(config.dateFormat) + '.ts';
 
       var captureProcess = childProcess.spawn('ffmpeg', [
         '-hide_banner',
         '-v',
         'fatal',
         '-i',
-        `http://video${myModel.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${100000000 + myModel.uid}.f4v_mobile/playlist.m3u8?nc=1423603882490`,
+        `http://video${myModel.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${100000000 + myModel.uid}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`,
         '-c',
         'copy',
         '-vsync',
@@ -214,7 +219,7 @@ function createFfmpegCaptureProcess(myModel) {
         '60',
         '-b:v',
         '500k',
-        `${captureDirectory}/${filename}`
+        path.join(captureDirectory, filename)
       ]);
 
       if (!captureProcess.pid) {
@@ -238,14 +243,20 @@ function createFfmpegCaptureProcess(myModel) {
           remove(stoppedModel, capturingModels);
         }
 
-        fs.statAsync(`${captureDirectory}/${filename}`)
+        fs.statAsync(path.join(captureDirectory, filename))
           .then(stats => {
             if (stats.size <= (config.minFileSizeMb * 1048576)) {
-              fs.unlink(captureDirectory + '/' + filename, err => {
+              fs.unlink(path.join(captureDirectory, filename), err => {
                 // do nothing, shit happens
               });
+            } else if (config.createModelDirectory) {
+              mv(path.join(captureDirectory, filename), path.join(completeDirectory, myModel.dir_nm, filename), { mkdirp: true }, err => {
+                if (err) {
+                  printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
+                }
+              });
             } else {
-              mv(captureDirectory + '/' + filename, completeDirectory + '/' + filename, err => {
+              mv(path.join(captureDirectory, filename), path.join(completeDirectory, filename), err => {
                 if (err) {
                   printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
                 }
@@ -309,7 +320,7 @@ function checkCaptureProcess(capturingModel) {
   }
 
   return fs
-    .statAsync(captureDirectory + '/' + capturingModel.filename)
+    .statAsync(path.join(captureDirectory, capturingModel.filename))
     .then(stats => {
       // we check the process every 10 minutes since its start,
       // if the size of the file has not changed for the last 10 min, we kill the process
@@ -393,7 +404,7 @@ function mainLoop() {
       printErrorMsg(err);
     })
     .finally(() => {
-      printMsg('Done, will search for new models in ' + config.modelScanInterval + ' second(s).');
+      printMsg(`Done, will search for new models in ${config.modelScanInterval} second(s).`);
 
       setTimeout(mainLoop, config.modelScanInterval * 1000);
     });
@@ -415,13 +426,25 @@ Promise
   });
 
 dispatcher.onGet('/', (req, res) => {
-  fs.readFile('./index.html', (err, data) => {
+  fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
     if (err) {
       res.writeHead(404, { 'Content-Type': 'text/html' });
       res.end('Not Found');
     } else {
       res.writeHead(200, { 'Content-Type': 'text/html' });
       res.end(data, 'utf-8');
+    }
+  });
+});
+
+dispatcher.onGet('/favicon.ico', (req, res) => {
+  fs.readFile(path.join(__dirname, 'favicon.ico'), (err, data) => {
+    if (err) {
+      res.writeHead(404, { 'Content-Type': 'text/html' });
+      res.end('Not Found');
+    } else {
+      res.writeHead(200, { 'Content-Type': 'image/x-icon' });
+      res.end(data);
     }
   });
 });
@@ -441,7 +464,7 @@ dispatcher.onGet('/models/include', addInQueue);
 dispatcher.onGet('/models/exclude', addInQueue);
 
 // whenever we delete the model we only "express our intention" to do so,
-// in fact the model will be markd as "deleted" in config only with the next iteration of mainLoop
+// in fact the model will be marked as "deleted" in config only with the next iteration of mainLoop
 dispatcher.onGet('/models/delete', addInQueue);
 
 dispatcher.onError((req, res) => {

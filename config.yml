@@ -1,8 +1,11 @@
 captureDirectory: ./captures
 completeDirectory: ./complete
 modelScanInterval: 30
+createModelDirectory: true
+dateFormat: YYYYMMDD-HHmmss
 minFileSizeMb: 10
 port: 9080
 debug: false
 models: []
 queue: []
+rtmp: false

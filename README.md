@@ -1,8 +1,6 @@
 mfc-node
 ==========
 
-> Note: This is version has absolutely the same functionality with previous one, however, the code was simplified and cleaned from outdated parts.
-
 mfc-node lets you follow and record your favorite models' shows on myfreecams.com
 
 This is an attempt to create a script similar to [capturbate-node](https://github.com/sstativa/capturebate-node) based on different pieces of code found on the Internet.
@@ -12,6 +10,10 @@ This is an attempt to create a script similar to [capturbate-node](https://githu
 Credits:
 * [capturbate-node](https://github.com/sstativa/capturebate-node)
 * [MFCAuto](https://github.com/ZombieAlex/MFCAuto)
+
+Want to support?
+==========
+[<img height="36" style="border:0px;height:36px;" src="https://az743702.vo.msecnd.net/cdn/kofi4.png?v=f" border="0" alt="Buy Me a Coffee at ko-fi.com">](https://ko-fi.com/A320FTJ)
 
 Requirements
 ==========
@@ -23,9 +25,9 @@ Setup
 ===========
 
 1. Install [Node.js](https://nodejs.org/download/) (tested with 4.6.x and 6.3.x).
-2. Download and unpack the [code](https://github.com/sstativa/mfc-node/archive/v2.zip).
+2. Download and unpack the [code](https://github.com/sstativa/mfc-node/archive/master.zip).
 3. Open Terminal (macOS) or Command Prompt (Windows) and go into the directory where you unpacked the files.
-4. Install requirements by running `npm install` in the same directory as `main.js` is.
+4. Install requirements by running `npm install` in the same directory as `main.js` is (Windows users have to install [Git](https://git-scm.com/download/win)).
 5. Edit `config.yml` file and set desirable values for `captureDirectory`, `completeDirectory`, `modelScanInterval`.
 6. Install [ffmpeg](https://www.ffmpeg.org/download.html). For Windows users, copy `ffmpeg.exe` into same directory as `main.js` is.
 
