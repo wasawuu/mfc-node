@@ -24,7 +24,7 @@ Requirements
 Setup
 ===========
 
-1. Install [Node.js](https://nodejs.org/download/) (tested with 4.6.x and 6.3.x).
+1. Install [Node.js](https://nodejs.org/download/) (minimum node version requirement: v6).
 2. Download and unpack the [code](https://github.com/sstativa/mfc-node/archive/master.zip).
 3. Open Terminal (macOS) or Command Prompt (Windows) and go into the directory where you unpacked the files.
 4. Install requirements by running `npm install` in the same directory as `main.js` is (Windows users have to install [Git](https://git-scm.com/download/win)).
