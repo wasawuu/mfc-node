@@ -43,10 +43,12 @@ function getFiles() {
   var files = [];
 
   return new Promise((resolve, reject) => {
-    filewalker(srcDirectory, { maxPending: 1, matchRegExp: /(\.ts|\.flv)$/ })
+    filewalker(srcDirectory, { maxPending: 1, matchRegExp: /^[^\.]/ })
       .on('file', p => {
-        // push path relative to srcDirectory
-        files.push(p);
+        if (p.match(/(\.ts|\.flv)$/)) {
+          // push path relative to srcDirectory
+          files.push(p);
+        }
       })
       .on('done', () => {
         resolve(files);
@@ -61,8 +63,8 @@ function getTsSpawnArguments(srcFile, dstFile) {
     srcFile,
     '-y',
     '-hide_banner',
-    // '-loglevel',
-    // 'panic',
+    '-loglevel',
+    'panic',
     '-c:v',
     'copy',
     '-c:a',
