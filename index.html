@@ -30,6 +30,12 @@
       padding-left: 40px;
     }
 
+    @media (max-width: 1024px) {
+      .mdl-layout__header-row {
+        padding-left: 16px;
+      }
+    }
+
     .padding {
       display: table-cell;
       width: 50%;
@@ -66,14 +72,89 @@
       top: 30px;
     }
 
+    .mdl-layout-title {
+      display: none;
+    }
+
+    .mdl-layout-spacer {
+      display: none;
+    }
+
     .ko-fi {
       display: none;
+    }
+
+    .filter {
+      flex-grow: 1;
+      margin-right: 15px;
+      position: relative;
+    }
+
+    .filter input {
+      background: rgba(255, 255, 255, 0.2);
+      border-radius: 3px;
+      border: none;
+      box-sizing: border-box;
+      color: rgba(255, 255, 255, 0.7);
+      font-size: 13px;
+      line-height: 34px;
+      margin-top: -1px;
+      padding-left: 35px;
+      padding-right: 35px;
+      width: 100%;
+    }
+
+    .filter input:active,
+    .filter input:focus {
+      outline: none;
+      color: rgba(255, 255, 255, 1);
+    }
+
+    .search-icon {
+      color: rgba(255, 255, 255, 0.7);
+      display: block;
+      position: absolute;
+      left: 7px;
+      top: 7px;
+      font-size: 20px;
+      transition: color 0.2s linear;
+    }
+
+    .filter-clear {
+      cursor: pointer;
+      color: rgba(255, 255, 255, 0.7);;
+      display: block;
+      position: absolute;
+      right: 7px;
+      top: 7px;
+      font-size: 20px;
+      transition: color 0.2s linear;
+    }
+
+    .filter input:focus + .search-icon {
+      color: #fff;
+    }
+
+    .filter input:focus + .search-icon + .filter-clear {
+      color: #fff;
     }
 
     @media (min-width: 768px) {
       .ko-fi {
         margin-right: 15px;
         display: block;
+      }
+
+      .mdl-layout-title {
+        display: block;
+      }
+
+      .mdl-layout-spacer {
+        display: block;
+      }
+
+      .filter {
+        flex-grow: 0;
       }
     }
   </style>
@@ -87,6 +168,11 @@
       <div class="mdl-layout__header-row">
         <span class="mdl-layout-title">MyFreeCams Recorder</span>
         <div class="mdl-layout-spacer"></div>
+        <div class="filter">
+          <input type="text" class="search" ng-model="vm.keyword" ng-keyup="vm.setFilter($event)">
+          <i class="material-icons search-icon">search</i>
+          <i class="material-icons filter-clear" ng-hide="!vm.filter.$" ng-click="vm.clearFilter()">clear</i>
+        </div>
         <a class="ko-fi" href='https://ko-fi.com/A320FTJ' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://az743702.vo.msecnd.net/cdn/kofi4.png?v=f' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
         <nav class="mdl-navigation">
           <button class="refresh mdl-button mdl-js-button mdl-button--fab mdl-button--colored mdl-shadow--4dp" ng-click="vm.refresh()" title="reload">
@@ -114,7 +200,7 @@
             </tr>
           </thead>
           <tbody>
-            <tr ng-repeat="model in vm.models | orderBy:vm.sortType:vm.sortReverse" ng-class="model.color">
+            <tr ng-repeat="model in vm.models | filter: vm.filter | orderBy:vm.sortType:vm.sortReverse" ng-class="model.color">
               <td class="mdl-data-table__cell--non-numeric">
                 <a class="mdl-color-text--blue-800" target="_blank" ng-href="https://www.myfreecams.com/#{{ model.nm }}" ng-click="vm.log(model)" ng-bind="::model.nm"></a>
               </td>
@@ -157,12 +243,9 @@
 
       vm.models = [];
 
+      vm.filter = {};
       vm.sortType = 'nm';
       vm.sortReverse = false;
-
-      vm.log = function (model) {
-        console.log('http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=' + Date.now());
-      };
 
       vm.sort = function (sortType) {
         if (vm.sortType === sortType) {
@@ -239,7 +322,27 @@
       };
 
       vm.dump = function (model) {
-      	console.log(model);
+        console.log(model);
+        console.log('http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=' + Date.now());
+      };
+
+      vm.setFilter = function (event) {
+        if (event.keyCode === 13) {
+          vm.filter = !vm.keyword ? {} : { $: vm.keyword };
+        }
+
+        $timeout(function () {
+          componentHandler.upgradeAllRegistered();
+        });
+      };
+
+      vm.clearFilter = function () {
+        vm.keyword = '';
+        vm.filter = {};
+
+        $timeout(function () {
+          componentHandler.upgradeAllRegistered();
+        });
       };
 
       vm.refresh = function () {
