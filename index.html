@@ -169,9 +169,9 @@
         <span class="mdl-layout-title">MyFreeCams Recorder</span>
         <div class="mdl-layout-spacer"></div>
         <div class="filter">
-          <input type="text" class="search" ng-model="vm.keyword" ng-keyup="vm.setFilter($event)">
+          <input type="text" class="search" ng-model="vm.keyword" ng-model-options="{ debounce: 500 }">
           <i class="material-icons search-icon">search</i>
-          <i class="material-icons filter-clear" ng-hide="!vm.filter.$" ng-click="vm.clearFilter()">clear</i>
+          <i class="material-icons filter-clear" ng-hide="!vm.filter.keywords" ng-click="vm.clearFilter()">clear</i>
         </div>
         <a class="ko-fi" href='https://ko-fi.com/A320FTJ' target='_blank'><img height='36' style='border:0px;height:36px;' src='https://az743702.vo.msecnd.net/cdn/kofi4.png?v=f' border='0' alt='Buy Me a Coffee at ko-fi.com' /></a>
         <nav class="mdl-navigation">
@@ -238,11 +238,12 @@
   <script>
     var app = angular.module('app', []);
 
-    app.controller('AppController', ['$timeout', '$http', function ($timeout, $http) {
+    app.controller('AppController', ['$timeout', '$http', '$scope', function ($timeout, $http, $scope) {
       var vm = this;
 
       vm.models = [];
 
+      vm.keyword = null;
       vm.filter = {};
       vm.sortType = 'nm';
       vm.sortReverse = false;
@@ -326,15 +327,13 @@
         console.log('http://video' + (model.camserv - 500) + '.myfreecams.com:1935/NxServer/ngrp:mfc_' + (100000000 + model.uid) + '.f4v_mobile/playlist.m3u8?nc=' + Date.now());
       };
 
-      vm.setFilter = function (event) {
-        if (event.keyCode === 13) {
-          vm.filter = !vm.keyword ? {} : { $: vm.keyword };
-        }
+      $scope.$watch(function () { return vm.keyword }, function (newVal, oldVal) {
+        vm.filter = !newVal ? {} : { keywords: newVal };
 
         $timeout(function () {
           componentHandler.upgradeAllRegistered();
         });
-      };
+      }, true);
 
       vm.clearFilter = function () {
         vm.keyword = '';
@@ -353,6 +352,8 @@
           .then(function (response) {
             vm.models = response.data.map(function (m) {
               vm.setVs(m);
+
+              m.keywords = m.nm + '\n' + m.city + '\n' + m.country;
 
               if (m.city && m.city.length > 20) {
                 m.city = m.city.substr(0, 19) + '…';
