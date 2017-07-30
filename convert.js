@@ -43,9 +43,10 @@ function getFiles() {
   var files = [];
 
   return new Promise((resolve, reject) => {
-    filewalker(srcDirectory, { maxPending: 1, matchRegExp: /^[^\.]/ })
+    filewalker(srcDirectory, { maxPending: 1, matchRegExp: /(\.ts|\.flv)$/ })
       .on('file', p => {
-        if (p.match(/(\.ts|\.flv)$/)) {
+        // select only "not hidden" files
+        if (!p.match(/(^\.|\/\.)/)) {
           // push path relative to srcDirectory
           files.push(p);
         }
