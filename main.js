@@ -157,15 +157,18 @@ function selectMyModels() {
   var isDirty = false;
 
   _.each(config.models, configModel => {
-    if (configModel.mode !== 1) {
-      return;
-    }
 
     var onlineModel = _.findWhere(onlineModels, { uid: configModel.uid });
 
     // if undefined then the model is offline
     if (_.isUndefined(onlineModel)) {
       return; // skip the rest of the function
+    }
+
+    if (configModel.mode !== 1) {
+      onlineModel.mode = configModel.mode;
+
+      return;
     }
 
     // save the name of the model in config
