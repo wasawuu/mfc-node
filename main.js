@@ -34,7 +34,7 @@ config.rtmp = config.rtmp || false;
 config.models = Array.isArray(config.models) ? config.models : [];
 config.queue = Array.isArray(config.queue) ? config.queue : [];
 config.dateFormat = config.dateFormat || 'YYYYMMDD-HHmmss';
-config.createModelDirectory = config.createModelDirectory || true;
+config.createModelDirectory = !!config.createModelDirectory;
 
 var captureDirectory = path.resolve(config.captureDirectory);
 var completeDirectory = path.resolve(config.completeDirectory);
@@ -413,7 +413,7 @@ function mainLoop() {
     });
 }
 
-var mfcClient = new mfc.Client();
+var mfcClient = new mfc.Client('guest', 'guest', true);
 
 Promise
   .try(() => mfcClient.connectAndWaitForModels())
