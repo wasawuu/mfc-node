@@ -2,12 +2,11 @@
 
 var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
-var mv = require('mv');
+var mvAsync = Promise.promisify(require('mv'));
+var mkdirp = require('mkdirp');
 var moment = require('moment');
 var colors = require('colors');
-var mkdirp = require('mkdirp');
 var yaml = require('js-yaml');
-var _ = require('underscore');
 var path = require('path');
 var childProcess = require('child_process');
 var HttpDispatcher = require('httpdispatcher');
@@ -16,11 +15,9 @@ var http = require('http');
 var mfc = require('MFCAuto');
 var EOL = require('os').EOL;
 
-// mfc.setLogLevel(5);
-
-var onlineModels = []; // the list of models from myfreecams.com
-var capturingModels = []; // the list of currently capturing models
-var cachedModels = [];  // "cached" copy of onlineModels (primarily for index.html)
+var onlineModels = []; // the list of online models from myfreecams.com
+var cachedModels = []; // "cached" copy of onlineModels (primarily for index.html)
+var captureModels = []; // the list of currently capturing models
 
 var config = yaml.safeLoad(fs.readFileSync('config.yml', 'utf8'));
 
@@ -29,8 +26,8 @@ config.completeDirectory = config.completeDirectory || './complete';
 config.modelScanInterval = config.modelScanInterval || 30;
 config.port = config.port || 9080;
 config.minFileSizeMb = config.minFileSizeMb || 0;
-config.debug = config.debug || false;
-config.rtmp = config.rtmp || false;
+config.debug = !!config.debug;
+config.rtmp = !!config.rtmp;
 config.models = Array.isArray(config.models) ? config.models : [];
 config.queue = Array.isArray(config.queue) ? config.queue : [];
 config.dateFormat = config.dateFormat || 'YYYYMMDD-HHmmss';
@@ -38,6 +35,28 @@ config.createModelDirectory = !!config.createModelDirectory;
 
 var captureDirectory = path.resolve(config.captureDirectory);
 var completeDirectory = path.resolve(config.completeDirectory);
+var isDirty = false;
+var minFileSize = config.minFileSizeMb * 1048576;
+
+var mfcClient = new mfc.Client();
+
+function getCurrentDateTime() {
+  return colors.gray('[' + moment().format('MM/DD/YYYY - HH:mm:ss') + ']');
+}
+
+function printMsg(msg) {
+  console.log(getCurrentDateTime(), msg);
+}
+
+function printErrorMsg(msg) {
+  console.log(getCurrentDateTime(), colors.red('[ERROR]'), msg);
+}
+
+function printDebugMsg(msg) {
+  if (config.debug && msg) {
+    console.log(getCurrentDateTime(), colors.yellow('[DEBUG]'), msg);
+  }
+}
 
 function mkdir(dir) {
   mkdirp(dir, err => {
@@ -48,26 +67,8 @@ function mkdir(dir) {
   });
 }
 
-function getCurrentDateTime() {
-  return moment().format('MM/DD/YYYY - HH:mm:ss'); // The only true way of writing out dates and times, ISO 8601
-}
-
-function printMsg(msg) {
-  console.log(colors.gray(`[${getCurrentDateTime()}]`), msg);
-}
-
-function printErrorMsg(msg) {
-  console.log(colors.gray(`[${getCurrentDateTime()}]`), colors.red('[ERROR]'), msg);
-}
-
-function printDebugMsg(msg) {
-  if (config.debug && msg) {
-    console.log(colors.gray(`[${getCurrentDateTime()}]`), colors.yellow('[DEBUG]'), msg);
-  }
-}
-
 function remove(value, array) {
-  var idx = array.indexOf(value);
+  let idx = array.indexOf(value);
 
   if (idx !== -1) {
     array.splice(idx, 1);
@@ -75,14 +76,10 @@ function remove(value, array) {
 }
 
 function getOnlineModels() {
-  var models = [];
+  let models = [];
 
   mfc.Model.knownModels.forEach(m => {
-    if (m.bestSession.vs !== mfc.STATE.Offline && m.bestSession.camserv > 0) {
-      if (!m.bestSession.nm) {
-        printErrorMsg(m.bestSession);
-      }
-
+    if (m.bestSession.vs !== mfc.STATE.Offline && m.bestSession.camserv > 0 && !!m.bestSession.nm) {
       models.push({
         uid: m.bestSession.uid,
         vs: m.bestSession.vs,
@@ -106,114 +103,192 @@ function getOnlineModels() {
   printMsg(`${onlineModels.length} model(s) online`);
 }
 
-// goes through the models in the queue and updates their settings in config
 function updateConfigModels() {
   printDebugMsg(`${config.queue.length} model(s) in the queue`);
 
-  var isDirty = false;
+  config.queue = config.queue.filter(queueModel => {
+    // if uid is not set then search uid of the model in the list of online models
+    if (!queueModel.uid) {
+      let onlineModel = onlineModels.find(m => (m.nm === queueModel.nm));
 
-  // move models from the queue to config
-  config.queue = _.filter(config.queue, queueModel => {
-    var uid = queueModel.uid;
-
-    if (_.isUndefined(uid)) {
-      let onlineModel = _.findWhere(onlineModels, { nm: queueModel.nm });
-
-      if (_.isUndefined(onlineModel)) {
-        return true; // keep in the queue
+      // if we could not find the uid of the model we leave her in the queue and jump to the next queue model
+      if (!onlineModel) {
+        return true;
       }
 
-      uid = onlineModel.uid;
+      queueModel.uid = onlineModel.uid;
     }
 
-    var configModel = _.findWhere(config.models, { uid: uid });
+    // looking for the model in our config
+    let configModel = config.models.find(m => (m.uid === queueModel.uid));
 
-    if (_.isUndefined(configModel)) {
-      config.models.push({ uid: uid, mode: queueModel.mode });
+    if (!configModel) {
+      // if we don't have the model in our config we add here in
+      config.models.push({
+        uid: queueModel.uid,
+        mode: queueModel.mode
+      });
     } else {
       configModel.mode = queueModel.mode;
     }
 
     isDirty = true;
+
+    // probably here we should remove duplicates from config
+
+    return false;
   });
-
-  if (isDirty) {
-    // remove duplicates,
-    // we should not have duplicates, but just in case...
-    config.models = _.uniq(config.models, m => {
-      return m.uid;
-    });
-
-    printDebugMsg('Save changes in config.yml');
-
-    fs.writeFileSync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8');
-  }
 }
 
-function selectMyModels() {
+function selectModelsToCapture() {
   printDebugMsg(`${config.models.length} model(s) in config`);
 
-  var myModels = [];
-  var isDirty = false;
+  let modelsToCapture = [];
+  let now = moment().unix();
 
-  _.each(config.models, configModel => {
+  config.models.forEach(configModel => {
+    let onlineModel = onlineModels.find(m => (m.uid === configModel.uid));
 
-    var onlineModel = _.findWhere(onlineModels, { uid: configModel.uid });
-
-    // if undefined then the model is offline
-    if (_.isUndefined(onlineModel)) {
-      return; // skip the rest of the function
-    }
-
-    if (configModel.mode !== 1) {
-      onlineModel.mode = configModel.mode;
-
+    if (!onlineModel) { // skip the model if she is not online
       return;
     }
 
-    // save the name of the model in config
+    // if the model has "expired" me mark her as "excluded"
+    if (configModel.mode > 1 && configModel.mode < now) {
+      printMsg(colors.green(onlineModel.nm) + ' expired');
+
+      configModel.mode = 0;
+
+      isDirty = true;
+    }
+
+    onlineModel.mode = configModel.mode;
+
+    if (configModel.mode < 1) { // skip the mode if she is "deleted" or "excluded"
+      return;
+    }
+
+    // save the name of the model in config if it has not been set before
     if (!configModel.nm) {
       configModel.nm = onlineModel.nm;
 
       isDirty = true;
     }
 
-    onlineModel.mode = configModel.mode;
     onlineModel.dir_nm = configModel.nm;
 
-    if (onlineModel.vs === 0 || onlineModel.vs === 90) { // probably 90 should be removed
-      myModels.push(onlineModel);
+    if (onlineModel.vs === 0) {
+      modelsToCapture.push(onlineModel);
     } else {
-      printMsg(`${colors.green(onlineModel.nm)} is away or in a private`);
+      printMsg(`${colors.green(onlineModel.nm)} is away or in a private (vs = ${onlineModel.vs})`);
     }
   });
 
-  if (isDirty) {
-    printDebugMsg('Save changes in config.yml');
+  printDebugMsg(`${modelsToCapture.length} model(s) to capture`);
 
-    fs.writeFileSync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8');
-  }
-
-  printDebugMsg(`${myModels.length} model(s) to capture`);
-
-  return myModels;
+  return modelsToCapture;
 }
 
-function createRtmpCaptureProcess(myModel) {
-  // "classified", currently I'm not interested to make this part public
+function createRtmpCaptureProcess(model) {
+  return Promise
+    .try(() => mfcClient.joinRoom(model.uid))
+    .then(packet => {
+      let sid = mfcClient.sessionId;
+      let server = model.camserv - 500;
+      let filename = model.nm + '-' + moment().format(config.dateFormat) + '-flv.flv';
+      let captureProcess = childProcess.spawn('rtmpdump', [
+        '-q',
+        '-a',
+        'NxServer',
+        '-f',
+        'WIN 25,0,0,127', // MAC 22,0,0,209
+        '-W',
+        'http://www.myfreecams.com/flash/Video170322.swf',
+        '-s',
+        'http://www.myfreecams.com/flash/Video170322.swf',
+        '-t',
+        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+        '-r',
+        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+        '-p',
+        'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&cache_id=1485777695&target=main',
+        '-C',
+        `N:${sid}`,
+        '-C',
+        'S:""',
+        '-C',
+        `N:${100000000 + model.uid}`,
+        '-C',
+        'S:DOWNLOAD',
+        '-C',
+        `N:${model.uid}`,
+        '-y',
+        `mp4:mfc_${100000000 + model.uid}.f4v`,
+        config.rtmpDebug ? '-V' : '',
+        '-o',
+        path.join(captureDirectory, filename)
+      ]);
+
+      if (!captureProcess.pid) {
+        return;
+      }
+
+      captureProcess.stdout.on('data', data => {
+        printMsg(data.toString());
+      });
+
+      captureProcess.stderr.on('data', data => {
+        printMsg(data.toString());
+      });
+
+      captureProcess.on('close', code => {
+        printMsg(`${colors.green(model.nm)} stopped streaming`);
+
+        let stoppedModel = captureModels.find(m => m.captureProcess === captureProcess);
+
+        remove(stoppedModel, captureModels);
+
+        let src = path.join(captureDirectory, filename);
+        let dst = config.createModelDirectory
+          ? path.join(completeDirectory, model.dir_nm, filename)
+          : path.join(completeDirectory, filename);
+
+        fs.statAsync(src)
+          // if the file is big enough we keep it otherwise we delete it
+          .then(stats => (stats.size <= minFileSize) ? fs.unlinkAsync(src) : mvAsync(src, dst, { mkdirp: true }))
+          .catch(err => {
+            if (err.code !== 'ENOENT') {
+              printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
+            }
+          });
+      });
+
+      captureModels.push({
+        nm: model.nm,
+        uid: model.uid,
+        filename: filename,
+        captureProcess: captureProcess,
+        checkAfter: moment().unix() + 60, // we are gonna check this process after 1 min
+        size: 0
+      });
+    })
+    .catch(err => {
+      printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
+    });
 }
 
-function createFfmpegCaptureProcess(myModel) {
+function createFfmpegCaptureProcess(model) {
   return Promise
     .try(() => {
-      var filename = myModel.nm + '-' + moment().format(config.dateFormat) + '.ts';
+      let server = model.camserv - 500;
+      let filename = model.nm + '-' + moment().format(config.dateFormat) + '-ts.ts';
 
-      var captureProcess = childProcess.spawn('ffmpeg', [
+      let captureProcess = childProcess.spawn('ffmpeg', [
         '-hide_banner',
         '-v',
         'fatal',
         '-i',
-        `http://video${myModel.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${100000000 + myModel.uid}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`,
+        `http://video${server}.myfreecams.com:1935/NxServer/ngrp:mfc_${100000000 + model.uid}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`,
         '-c',
         'copy',
         '-vsync',
@@ -238,126 +313,176 @@ function createFfmpegCaptureProcess(myModel) {
       });
 
       captureProcess.on('close', code => {
-        printMsg(`${colors.green(myModel.nm)} stopped streaming`);
+        printMsg(`${colors.green(model.nm)} stopped streaming`);
 
-        var stoppedModel = _.findWhere(capturingModels, { captureProcess: captureProcess });
+        let stoppedModel = captureModels.find(m => m.captureProcess === captureProcess);
 
-        if (!_.isUndefined(stoppedModel)) {
-          remove(stoppedModel, capturingModels);
-        }
+        remove(stoppedModel, captureModels);
 
-        fs.statAsync(path.join(captureDirectory, filename))
-          .then(stats => {
-            if (stats.size <= (config.minFileSizeMb * 1048576)) {
-              fs.unlink(path.join(captureDirectory, filename), err => {
-                // do nothing, shit happens
-              });
-            } else if (config.createModelDirectory) {
-              mv(path.join(captureDirectory, filename), path.join(completeDirectory, myModel.dir_nm, filename), { mkdirp: true }, err => {
-                if (err) {
-                  printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
-                }
-              });
-            } else {
-              mv(path.join(captureDirectory, filename), path.join(completeDirectory, filename), err => {
-                if (err) {
-                  printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
-                }
-              });
-            }
-          })
+        let src = path.join(captureDirectory, filename);
+        let dst = config.createModelDirectory
+          ? path.join(completeDirectory, model.dir_nm, filename)
+          : path.join(completeDirectory, filename);
+
+        fs.statAsync(src)
+          // if the file is big enough we keep it otherwise we delete it
+          .then(stats => (stats.size <= minFileSize) ? fs.unlinkAsync(src) : mvAsync(src, dst, { mkdirp: true }))
           .catch(err => {
             if (err.code !== 'ENOENT') {
-              printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
+              printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
             }
           });
       });
 
-      capturingModels.push({
-        nm: myModel.nm,
-        uid: myModel.uid,
+      captureModels.push({
+        nm: model.nm,
+        uid: model.uid,
         filename: filename,
         captureProcess: captureProcess,
-        checkAfter: moment().unix() + 600, // we are gonna check this process after 10 min
+        checkAfter: moment().unix() + 60, // we are gonna check this process after 1 min
         size: 0
       });
     })
     .catch(err => {
-      printErrorMsg('[' + colors.green(myModel.nm) + '] ' + err.toString());
+      printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
     });
 }
 
-function createCaptureProcess(myModel) {
-  var capturingModel = _.findWhere(capturingModels, { uid: myModel.uid });
-
-  if (capturingModel !== undefined) {
-    printDebugMsg(colors.green(myModel.nm) + ' is already capturing');
-
-    return; // resolve immediately
+function createCaptureProcess(model) {
+  if (model.camserv < 840) { // skip models without "mobile feed"
+    return;
   }
 
-  printMsg(colors.green(myModel.nm) + ' is now online, starting capturing process');
+  let captureModel = captureModels.find(m => (m.uid === model.uid));
 
-  return config.rtmp ? createRtmpCaptureProcess(myModel) : createFfmpegCaptureProcess(myModel);
+  if (captureModel) {
+    printDebugMsg(colors.green(model.nm) + ' is already capturing');
+
+    return;
+  }
+
+  printMsg(colors.green(model.nm) + ' is now online, starting capturing process');
+
+  return config.rtmp ? createRtmpCaptureProcess(model) : createFfmpegCaptureProcess(model);
 }
 
-function checkCaptureProcess(capturingModel) {
-  var onlineModel = _.findWhere(onlineModels, { uid: capturingModel.uid });
+function checkCaptureProcess(model) {
+  var onlineModel = onlineModels.find(m => (m.uid === model.uid));
 
-  if (onlineModel !== undefined) {
-    if (onlineModel.mode === 1) {
+  if (onlineModel) {
+    if (onlineModel.mode >= 1) {
       onlineModel.capturing = true;
-    } else if (capturingModel.captureProcess) {
-      // if the model has been excluded or deleted we stop capturing process and resolve immediately
-      printDebugMsg(colors.green(capturingModel.nm) + ' has to be stopped');
+    } else if (model.captureProcess) {
+      // if the model was excluded or deleted we stop her "captureProcess"
+      printDebugMsg(colors.green(model.nm) + ' has to be stopped');
 
-      capturingModel.captureProcess.kill();
+      model.captureProcess.kill();
 
       return;
     }
   }
 
-  // if this is not the time to check the process then we resolve immediately
-  if (capturingModel.checkAfter > moment().unix()) {
+  // if this is not the time to check the process and resolve immediately
+  if (model.checkAfter > moment().unix()) {
     return;
   }
 
   return fs
-    .statAsync(path.join(captureDirectory, capturingModel.filename))
+    .statAsync(path.join(captureDirectory, model.filename))
     .then(stats => {
-      // we check the process every 10 minutes since its start,
-      // if the size of the file has not changed for the last 10 min, we kill the process
-      if (stats.size - capturingModel.size > 0) {
-        printDebugMsg(colors.green(capturingModel.nm) + ' is alive');
+      // we check model's process every 10 minutes,
+      // if the size of the file has not changed for the last 10 min, we kill this process
+      if (stats.size > model.size) {
+        printDebugMsg(colors.green(model.nm) + ' is alive');
 
-        capturingModel.checkAfter = moment().unix() + 300; // 5 minutes
-        capturingModel.size = stats.size;
-      } else if (capturingModel.captureProcess) {
-        // we assume that onClose will do all clean up for us
-        printErrorMsg('[' + colors.green(capturingModel.nm) + '] Process is dead');
-        capturingModel.captureProcess.kill();
+        model.checkAfter = moment().unix() + 300; // 5 minutes
+        model.size = stats.size;
+      } else if (model.captureProcess) {
+        // we assume that onClose will do all the cleaning for us
+        printErrorMsg('[' + colors.green(model.nm) + '] Process is dead');
+        model.captureProcess.kill();
       } else {
-        // suppose here we should forcefully remove the model from capturingModels
-        // because her captureProcess is unset, but let's leave this as is
-        // remove(capturingModel, capturingModels);
+        // probably we should forcefully remove the model from captureModels
+        // because her captureProcess is unset, but let's leave it as is for now
+        // remove(model, captureModels);
       }
     })
     .catch(err => {
       if (err.code === 'ENOENT') {
         // do nothing, file does not exists,
-        // this is kind of impossible case, however, probably there should be some code to "clean up" the process
       } else {
-        printErrorMsg('[' + colors.green(capturingModel.nm) + '] ' + err.toString());
+        printErrorMsg('[' + colors.green(model.nm) + '] ' + err.toString());
       }
     });
 }
 
+function saveConfig() {
+  if (!isDirty) {
+    return;
+  }
+
+  // remove duplicates,
+  // we should not have them, but just in case...
+  config.models = config.models.filter((m, index, self) => (index === self.indexOf(m)));
+
+  printDebugMsg('Save changes in config.yml');
+
+  return fs
+    .writeFileAsync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8')
+    .then(() => {
+      isDirty = false;
+    });
+}
+
+function cacheModels() {
+  cachedModels = onlineModels.filter(m => (m.mode !== -1));
+}
+
+function mainLoop() {
+  printDebugMsg('Start new cycle');
+
+  Promise
+    .try(getOnlineModels)
+    .then(updateConfigModels)
+    .then(selectModelsToCapture)
+    .then(modelsToCapture => Promise.all(modelsToCapture.map(createCaptureProcess)))
+    .then(() => Promise.all(captureModels.map(checkCaptureProcess)))
+    .then(saveConfig)
+    .then(cacheModels)
+    .catch(printErrorMsg)
+    .finally(() => {
+      printMsg(`Done, will search for new models in ${config.modelScanInterval} second(s).`);
+
+      setTimeout(mainLoop, config.modelScanInterval * 1000);
+    });
+}
+
+mkdir(captureDirectory);
+mkdir(completeDirectory);
+
+Promise
+  .try(() => mfcClient.connectAndWaitForModels())
+  .timeout(120000) // if we could not get a list of online models in 2 minutes then exit
+  .then(() => mainLoop())
+  .catch(err => {
+    printErrorMsg(err.toString());
+    process.exit(1);
+  });
+
 function addInQueue(req, res) {
-  var model;
-  var mode = 0;
+  let model;
+  let mode = 0;
 
   if (req.url.startsWith('/models/include')) {
     mode = 1;
+
+    if (req.params && req.params.expire_after) {
+      let expireAfter = parseFloat(req.params.expire_after);
+
+      if (!isNaN(expireAfter) && expireAfter > 0) {
+        mode = moment().unix() + (expireAfter * 3600);
+      }
+    }
   } else if (req.url.startsWith('/models/delete')) {
     mode = -1;
   }
@@ -372,62 +497,26 @@ function addInQueue(req, res) {
     model = { nm: req.params.nm, mode: mode };
   }
 
-  if (_.isUndefined(model)) {
+  if (!model) {
     res.writeHead(422, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify({ error: 'Invalid request' }));
   } else {
-    printDebugMsg(colors.green(model.uid || model.nm) + ' to ' + (mode === 1 ? 'include' : (mode === 0 ? 'exclude' : 'delete')));
+    printDebugMsg(colors.green(model.uid || model.nm) + ' to ' + (mode >= 1 ? 'include' : (mode === 0 ? 'exclude' : 'delete')));
 
     config.queue.push(model);
 
-    let localModel = _.findWhere(cachedModels, !model.uid ? { nm: model.nm } : { uid: model.uid });
+    let cachedModel = !model.uid
+      ? cachedModels.find(m => (m.nm === model.nm))
+      : cachedModels.find(m => (m.uid === model.uid));
 
-    if (localModel !== undefined) {
-      localModel.nextMode = mode;
+    if (cachedModel) {
+      cachedModel.nextMode = mode;
     }
 
     res.writeHead(200, { 'Content-Type': 'application/json' });
     res.end(JSON.stringify(model)); // this will be sent back to the browser
   }
 }
-
-function mainLoop() {
-  printDebugMsg('Start new cycle');
-
-  Promise
-    .try(() => getOnlineModels())
-    .then(() => updateConfigModels()) // move models from the queue to config
-    .then(() => selectMyModels())
-    .then(myModels => Promise.all(myModels.map(createCaptureProcess)))
-    .then(() => Promise.all(capturingModels.map(checkCaptureProcess)))
-    .then(() => {
-      cachedModels = _.reject(onlineModels, onlineModel => (onlineModel.mode === -1));
-    })
-    .catch(err => {
-      printErrorMsg(err);
-    })
-    .finally(() => {
-      printMsg(`Done, will search for new models in ${config.modelScanInterval} second(s).`);
-
-      setTimeout(mainLoop, config.modelScanInterval * 1000);
-    });
-}
-
-var mfcClient = new mfc.Client('guest', 'guest', true);
-
-Promise
-  .try(() => mfcClient.connectAndWaitForModels())
-  .timeout(120000) // 2 mins
-  .then(() => {
-    mkdir(captureDirectory);
-    mkdir(completeDirectory);
-
-    mainLoop();
-  })
-  .catch(err => {
-    printErrorMsg(err.toString());
-    process.exit(1);
-  });
 
 dispatcher.onGet('/', (req, res) => {
   fs.readFile(path.join(__dirname, 'index.html'), (err, data) => {
@@ -453,7 +542,6 @@ dispatcher.onGet('/favicon.ico', (req, res) => {
   });
 });
 
-// return an array of online models
 dispatcher.onGet('/models', (req, res) => {
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(cachedModels));
@@ -470,10 +558,6 @@ dispatcher.onGet('/models/exclude', addInQueue);
 // whenever we delete the model we only "express our intention" to do so,
 // in fact the model will be marked as "deleted" in config only with the next iteration of mainLoop
 dispatcher.onGet('/models/delete', addInQueue);
-
-dispatcher.onError((req, res) => {
-  res.writeHead(404);
-});
 
 http.createServer((req, res) => {
   dispatcher.dispatch(req, res);

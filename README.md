@@ -17,14 +17,14 @@ Want to support?
 
 Requirements
 ==========
-[Node.js](https://nodejs.org/download/) used to run mfc-node, hence the name.
+[Node.js](https://nodejs.org/download/) used to run mfc-node, hence the name (minimum node version requirement: v9.4).
 
 [ffmpeg](https://www.ffmpeg.org/download.html)
 
 Setup
 ===========
 
-1. Install [Node.js](https://nodejs.org/download/) (minimum node version requirement: v6).
+1. Install [Node.js](https://nodejs.org/download/) (minimum node version requirement: v9.4).
 2. Download and unpack the [code](https://github.com/sstativa/mfc-node/archive/master.zip).
 3. Open Terminal (macOS) or Command Prompt (Windows) and go into the directory where you unpacked the files.
 4. Install requirements by running `npm install` in the same directory as `main.js` is (Windows users have to install [Git](https://git-scm.com/download/win)).
