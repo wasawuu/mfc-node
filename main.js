@@ -14,6 +14,13 @@ var dispatcher = new HttpDispatcher();
 var http = require('http');
 var mfc = require('MFCAuto');
 var EOL = require('os').EOL;
+var compression = require('compression');
+var bhttp = require('bhttp');
+var session = bhttp.session();
+
+var useDefaultOptions = {};
+var compress = compression(useDefaultOptions);
+var noop = () => {};
 
 var onlineModels = []; // the list of online models from myfreecams.com
 var cachedModels = []; // "cached" copy of onlineModels (primarily for index.html)
@@ -75,7 +82,26 @@ function remove(value, array) {
   }
 }
 
-function getOnlineModels() {
+function getProxyModels() {
+  if (!config.proxyServer) {
+    return [];
+  }
+
+  return new Promise((resolve, reject) => {
+    return Promise
+      .try(() => session.get(`http://${config.proxyServer}/models?nc=${Date.now()}`))
+      .timeout(10000) // 10 seconds
+      .then(response => {
+        resolve(response.body || []);
+      })
+      .catch(err => {
+        printDebugMsg(err.toString());
+        resolve([]);
+      });
+  });
+}
+
+function getOnlineModels(proxyModels) {
   let models = [];
 
   mfc.Model.knownModels.forEach(m => {
@@ -98,7 +124,17 @@ function getOnlineModels() {
     }
   });
 
-  onlineModels = models;
+  if (proxyModels.length > 0) {
+    // remove models that available in the current region from proxyModels (foreign region)
+    let newModels = proxyModels.filter(pm => !models.find(m => (m.uid === pm.uid)));
+
+    printDebugMsg(`${newModels.length} new model(s) from proxy`);
+
+    // merge newModels with "local" models
+    onlineModels = newModels.concat(models);
+  } else {
+    onlineModels = models;
+  }
 
   printMsg(`${onlineModels.length} model(s) online`);
 }
@@ -442,7 +478,8 @@ function mainLoop() {
   printDebugMsg('Start new cycle');
 
   Promise
-    .try(getOnlineModels)
+    .try(getProxyModels)
+    .then(getOnlineModels)
     .then(updateConfigModels)
     .then(selectModelsToCapture)
     .then(modelsToCapture => Promise.all(modelsToCapture.map(createCaptureProcess)))
@@ -543,6 +580,8 @@ dispatcher.onGet('/favicon.ico', (req, res) => {
 });
 
 dispatcher.onGet('/models', (req, res) => {
+  compress(req, res, noop);
+
   res.writeHead(200, { 'Content-Type': 'application/json' });
   res.end(JSON.stringify(cachedModels));
 });

@@ -9,3 +9,4 @@ debug: true
 models: []
 queue: []
 rtmp: false
+proxyServer: '54.206.109.161:9090'

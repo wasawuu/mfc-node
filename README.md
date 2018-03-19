@@ -79,3 +79,14 @@ http://localhost:9080/models/delete?nm=modelname
 http://localhost:9080/models/delete?uid=12345678
 ```
 
+Proxy
+===========
+
+This is just a Proof of Concept to avoid region block.
+To use it you have to start `proxy.js` on some remote server from different region then add a parameter `proxyServer` to your local `config.yml`, for example, `proxyServer: '54.206.109.161:9090'`.
+
+The `main.js` script will try to get models from remote region then merge with the list of models available in your region.
+
+> Note: This is not a real-time application, expect inconsistency.
+
+> Note: '54.206.109.161:9090' from Sydney will be available for tests for a couple days, then will be stopped.
