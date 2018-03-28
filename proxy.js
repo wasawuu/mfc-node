@@ -61,7 +61,8 @@ function getOnlineModels() {
         missmfc: m.bestSession.missmfc,
         city: m.bestSession.city,
         country: '!!' + (m.bestSession.country || ''),
-        ethnic: m.bestSession.ethnic
+        ethnic: m.bestSession.ethnic,
+        phase: m.bestSession.phase
       });
     }
   });

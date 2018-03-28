@@ -26,14 +26,15 @@ var onlineModels = []; // the list of online models from myfreecams.com
 var cachedModels = []; // "cached" copy of onlineModels (primarily for index.html)
 var captureModels = []; // the list of currently capturing models
 
-var config = yaml.safeLoad(fs.readFileSync('config.yml', 'utf8'));
+var config = yaml.safeLoad(fs.readFileSync('config-rtmp-hd.yml', 'utf8'));
 
 config.captureDirectory = config.captureDirectory || './capture';
 config.completeDirectory = config.completeDirectory || './complete';
 config.modelScanInterval = config.modelScanInterval || 30;
-config.port = config.port || 9080;
+config.port = config.port || 9081;
 config.minFileSizeMb = config.minFileSizeMb || 0;
 config.debug = !!config.debug;
+config.rtmp = !!config.rtmp;
 config.models = Array.isArray(config.models) ? config.models : [];
 config.queue = Array.isArray(config.queue) ? config.queue : [];
 config.dateFormat = config.dateFormat || 'YYYYMMDD-HHmmss';
@@ -105,29 +106,30 @@ function getOnlineModels(proxyModels) {
 
   mfc.Model.knownModels.forEach(m => {
     if (m.bestSession.vs !== mfc.STATE.Offline && m.bestSession.camserv > 0 && !!m.bestSession.nm) {
-
-      models.push({
-        uid: m.bestSession.uid,
-        vs: m.bestSession.vs,
-        nm: m.bestSession.nm,
-        camserv: m.bestSession.camserv,
-        camscore: m.bestSession.camscore,
-        continent: m.bestSession.continent,
-        new_model: m.bestSession.new_model,
-        rc: m.bestSession.rc,
-        age: m.bestSession.age,
-        missmfc: m.bestSession.missmfc,
-        city: m.bestSession.city,
-        country: m.bestSession.country,
-        ethnic: m.bestSession.ethnic,
-        phase: m.bestSession.phase
-      });
+      if (m.bestSession.phase === 'a') {
+        models.push({
+          uid: m.bestSession.uid,
+          vs: m.bestSession.vs,
+          nm: m.bestSession.nm,
+          camserv: m.bestSession.camserv,
+          camscore: m.bestSession.camscore,
+          continent: m.bestSession.continent,
+          new_model: m.bestSession.new_model,
+          rc: m.bestSession.rc,
+          age: m.bestSession.age,
+          missmfc: m.bestSession.missmfc,
+          city: m.bestSession.city,
+          country: m.bestSession.country,
+          ethnic: m.bestSession.ethnic,
+          phase: m.bestSession.phase
+        });
+      }
     }
   });
 
   if (proxyModels.length > 0) {
     // remove models that available in the current region from proxyModels (foreign region)
-    let newModels = proxyModels.filter(pm => !models.find(m => (m.uid === pm.uid)));
+    let newModels = proxyModels.filter(pm => (pm.phase !== 'a' && !models.find(m => (m.uid === pm.uid))));
 
     printDebugMsg(`${newModels.length} new model(s) from proxy`);
 
@@ -226,30 +228,54 @@ function selectModelsToCapture() {
   return modelsToCapture;
 }
 
-function createFfmpegCaptureProcess(model) {
+function createRtmpCaptureProcess(model) {
   return Promise
-    .try(() => {
-      let filename = model.nm + '-' + moment().format(config.dateFormat) + '-ts.ts';
+    .try(() => mfcClient.joinRoom(model.uid))
+    .then(packet => {
+      let filename = model.nm + '-' + moment().format(config.dateFormat) + '-flv.flv';
+
+      let sid = mfcClient.sessionId;
       let roomId = 100000000 + model.uid;
 
-      let hlsUrl = (model.phase === 'a')
-        ? `https://video${model.camserv - 1000}.myfreecams.com:8444/x-hls/${mfcClient.stream_cxid}/${roomId}/${mfcClient.stream_password}/${mfcClient.stream_vidctx}/mfc_${model.phase}_${roomId}.m3u8`
-        : `http://video${model.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${roomId}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`;
+      let server = model.camserv - 1000;
+      let ctx = decodeURIComponent(mfcClient.stream_vidctx);
 
-      let captureProcess = childProcess.spawn('ffmpeg', [
-        '-hide_banner',
-        '-v',
-        'fatal',
-        '-i',
-        hlsUrl,
-        '-c',
-        'copy',
-        '-vsync',
-        '2',
+      let captureProcess = childProcess.spawn('rtmpdump', [
+        '-q',
+        '-a',
+        'NxServer',
+        '-f',
+        'WIN 25,0,0,127', // MAC 22,0,0,209
+        '-W',
+        'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
+        '-s',
+        'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
+        '-t',
+        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
         '-r',
-        '60',
-        '-b:v',
-        '500k',
+        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+        '-p',
+        'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
+        '-C',
+        `N:${sid}`,
+        '-C',
+        `S:${mfcClient.stream_password}`,
+        '-C',
+        `S:${roomId}`,
+        '-C',
+        'S:a',
+        '-C',
+        'S:DOWNLOAD',
+        '-C',
+        `N:${model.uid}`,
+        '-C',
+        'N:0',
+        '-C',
+        `S:${ctx}`,
+        '-y',
+        `mfc_${model.phase}_${roomId}?ctx=${ctx}&tkx=${mfcClient.stream_password}`,
+        config.rtmpDebug ? '-V' : '',
+        '-o',
         path.join(captureDirectory, filename)
       ]);
 
@@ -306,6 +332,11 @@ function createCaptureProcess(model) {
     return;
   }
 
+  // just in case
+  if (model.phase !== 'a') {
+    return;
+  }
+
   let captureModel = captureModels.find(m => (m.uid === model.uid));
 
   if (captureModel) {
@@ -316,7 +347,7 @@ function createCaptureProcess(model) {
 
   printMsg(colors.green(model.nm) + ' is now online, starting capturing process');
 
-  return createFfmpegCaptureProcess(model);
+  return createRtmpCaptureProcess(model);
 }
 
 function checkCaptureProcess(model) {
@@ -378,10 +409,10 @@ function saveConfig() {
   // we should not have them, but just in case...
   config.models = config.models.filter((m, index, self) => (index === self.indexOf(m)));
 
-  printDebugMsg('Save changes in config.yml');
+  printDebugMsg('Save changes in config-rtmp-hd.yml');
 
   return fs
-    .writeFileAsync('config.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8')
+    .writeFileAsync('config-rtmp-hd.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8')
     .then(() => {
       isDirty = false;
     });

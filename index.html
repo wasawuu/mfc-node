@@ -449,7 +449,9 @@
         if (!vm.model) {
           vm.snapshot = null;
         } else {
-          vm.snapshot = 'https://snap.mfcimg.com/snapimg/' + (vm.model.camserv - 500) + '/320x230/mfc_' + (100000000 + vm.model.uid) + '?no-cache=' + Date.now();
+          vm.snapshot = (vm.model.phase === 'a')
+            ? 'https://snap.mfcimg.com/snapimg/' + (vm.model.camserv - 1000) + '/320x240/mfc_a_' + (100000000 + vm.model.uid) + '?no-cache=' + Date.now()
+            : 'https://snap.mfcimg.com/snapimg/' + (vm.model.camserv - 500) + '/320x240/mfc_' + (100000000 + vm.model.uid) + '?no-cache=' + Date.now();
 
           $timeout(vm.setSnapshot, 500);
         }

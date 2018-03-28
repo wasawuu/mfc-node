@@ -4,7 +4,7 @@ modelScanInterval: 30
 createModelDirectory: true
 dateFormat: YYYYMMDD-HHmmss
 minFileSizeMb: 10
-port: 9080
+port: 9081
 debug: true
 models: []
 queue: []
