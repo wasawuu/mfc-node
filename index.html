@@ -314,6 +314,18 @@
 
       vm.serverModels = [];
       vm.models = [];
+      vm.ngvideo_servers = {
+        "1545":"545",
+        "1546":"546",
+        "1547":"547",
+        "1548":"548",
+        "1549":"549",
+        "1550":"550",
+        "1551":"551",
+        "1552":"552",
+        "1553":"553",
+        "1554":"554"
+      };
 
       vm.model = null;
 
@@ -449,9 +461,7 @@
         if (!vm.model) {
           vm.snapshot = null;
         } else {
-          vm.snapshot = (vm.model.phase === 'a')
-            ? 'https://snap.mfcimg.com/snapimg/' + (vm.model.camserv - 1000) + '/320x240/mfc_a_' + (100000000 + vm.model.uid) + '?no-cache=' + Date.now()
-            : 'https://snap.mfcimg.com/snapimg/' + (vm.model.camserv - 500) + '/320x240/mfc_' + (100000000 + vm.model.uid) + '?no-cache=' + Date.now();
+          vm.snapshot = vm.model.snapshot + '?no-cache=' + Date.now();
 
           $timeout(vm.setSnapshot, 500);
         }
@@ -465,6 +475,7 @@
 
       vm.refresh = function () {
         vm.ready = false;
+        var camserv;
 
         $http
           .get('/models')
@@ -473,7 +484,7 @@
 
               vm.setVs(m);
 
-              m.keywords = m.nm + '\n' + m.city + '\n' + m.country;
+              m.keywords = m.nm + '\n' + m.city + '\n' + m.country + (m.phase === 'a' ? '\nHD' : '');
 
               if (m.city && m.city.length > 20) {
                 m.city = m.city.substr(0, 19) + '…';
@@ -487,6 +498,14 @@
               m.new_model = m.new_model ? 'new_releases' : '';
 
               m.rc = m.rc || 0;
+
+              camserv = (!vm.ngvideo_servers[m.camserv])
+                ? m.camserv - 500
+                : vm.ngvideo_servers[m.camserv];
+
+              m.snapshot = (m.phase === 'a')
+                ? 'https://snap.mfcimg.com/snapimg/' + camserv + '/320x240/mfc_a_' + (100000000 + m.uid)
+                : 'https://snap.mfcimg.com/snapimg/' + camserv + '/320x240/mfc_' + (100000000 + m.uid);
 
               return m;
             });

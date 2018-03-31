@@ -26,7 +26,7 @@ var onlineModels = []; // the list of online models from myfreecams.com
 var cachedModels = []; // "cached" copy of onlineModels (primarily for index.html)
 var captureModels = []; // the list of currently capturing models
 
-var config = yaml.safeLoad(fs.readFileSync('config-rtmp-hd.yml', 'utf8'));
+var config = yaml.safeLoad(fs.readFileSync('config-rtmp.yml', 'utf8'));
 
 config.captureDirectory = config.captureDirectory || './capture';
 config.completeDirectory = config.completeDirectory || './complete';
@@ -34,7 +34,6 @@ config.modelScanInterval = config.modelScanInterval || 30;
 config.port = config.port || 9081;
 config.minFileSizeMb = config.minFileSizeMb || 0;
 config.debug = !!config.debug;
-config.rtmp = !!config.rtmp;
 config.models = Array.isArray(config.models) ? config.models : [];
 config.queue = Array.isArray(config.queue) ? config.queue : [];
 config.dateFormat = config.dateFormat || 'YYYYMMDD-HHmmss';
@@ -44,6 +43,7 @@ var captureDirectory = path.resolve(config.captureDirectory);
 var completeDirectory = path.resolve(config.completeDirectory);
 var isDirty = false;
 var minFileSize = config.minFileSizeMb * 1048576;
+var patchedRtmpdump = false;
 
 var mfcClient = new mfc.Client();
 
@@ -106,7 +106,9 @@ function getOnlineModels(proxyModels) {
 
   mfc.Model.knownModels.forEach(m => {
     if (m.bestSession.vs !== mfc.STATE.Offline && m.bestSession.camserv > 0 && !!m.bestSession.nm) {
-      if (m.bestSession.phase === 'a') {
+      // if rtmpdump is "patched" then add all models
+      // otherwise add only HD models
+      if (patchedRtmpdump || m.bestSession.phase === 'a') {
         models.push({
           uid: m.bestSession.uid,
           vs: m.bestSession.vs,
@@ -128,8 +130,10 @@ function getOnlineModels(proxyModels) {
   });
 
   if (proxyModels.length > 0) {
-    // remove models that available in the current region from proxyModels (foreign region)
-    let newModels = proxyModels.filter(pm => (pm.phase !== 'a' && !models.find(m => (m.uid === pm.uid))));
+    // remove models from proxyModels (foreign region) if they are available in the current region
+    let newModels = (patchedRtmpdump)
+      ? proxyModels.filter(pm => (!models.find(m => (m.uid === pm.uid))))
+      : proxyModels.filter(pm => (pm.phase !== 'a' && !models.find(m => (m.uid === pm.uid))));
 
     printDebugMsg(`${newModels.length} new model(s) from proxy`);
 
@@ -237,47 +241,91 @@ function createRtmpCaptureProcess(model) {
       let sid = mfcClient.sessionId;
       let roomId = 100000000 + model.uid;
 
-      let server = model.camserv - 1000;
       let ctx = decodeURIComponent(mfcClient.stream_vidctx);
 
-      let captureProcess = childProcess.spawn('rtmpdump', [
-        '-q',
-        '-a',
-        'NxServer',
-        '-f',
-        'WIN 25,0,0,127', // MAC 22,0,0,209
-        '-W',
-        'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
-        '-s',
-        'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
-        '-t',
-        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
-        '-r',
-        `rtmp://video${server}.myfreecams.com:1935/NxServer`,
-        '-p',
-        'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
-        '-C',
-        `N:${sid}`,
-        '-C',
-        `S:${mfcClient.stream_password}`,
-        '-C',
-        `S:${roomId}`,
-        '-C',
-        'S:a',
-        '-C',
-        'S:DOWNLOAD',
-        '-C',
-        `N:${model.uid}`,
-        '-C',
-        'N:0',
-        '-C',
-        `S:${ctx}`,
-        '-y',
-        `mfc_${model.phase}_${roomId}?ctx=${ctx}&tkx=${mfcClient.stream_password}`,
-        config.rtmpDebug ? '-V' : '',
-        '-o',
-        path.join(captureDirectory, filename)
-      ]);
+      let server;
+      let args;
+
+      if (model.phase === 'a') {
+        server = model.camserv - 1000;
+        args = [
+          '-q',
+          '-a',
+          'NxServer',
+          '-f',
+          'WIN 25,0,0,127', // MAC 22,0,0,209
+          '-W',
+          'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
+          '-s',
+          'https://www.myfreecams.com/flash/MfcVideoNg-1080p-20180316.swf?nc=130',
+          '-t',
+          `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+          '-r',
+          `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+          '-p',
+          // ip was set intentionally
+          'https://207.229.73.118/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
+          // 'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
+          '-C',
+          `N:${sid}`,
+          '-C',
+          `S:${mfcClient.stream_password}`,
+          '-C',
+          `S:${roomId}`,
+          '-C',
+          'S:a',
+          '-C',
+          'S:DOWNLOAD',
+          '-C',
+          `N:${model.uid}`,
+          '-C',
+          'N:0',
+          '-C',
+          `S:${ctx}`,
+          '-y',
+          `mfc_${model.phase}_${roomId}?ctx=${ctx}&tkx=${mfcClient.stream_password}`,
+          config.rtmpDebug ? '-V' : '',
+          '-o',
+          path.join(captureDirectory, filename),
+          '-m', 30
+        ];
+      } else {
+        server = model.camserv - 500;
+        args = [
+          '-q',
+          '-a',
+          'NxServer',
+          '-f',
+          'WIN 25,0,0,127', // MAC 22,0,0,209
+          '-W',
+          'https://www.myfreecams.com/flash/Video170823.swf',
+          '-s',
+          'https://www.myfreecams.com/flash/Video170823.swf',
+          '-t',
+          `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+          '-r',
+          `rtmp://video${server}.myfreecams.com:1935/NxServer`,
+          '-p',
+          'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&cache_id=1485777695&target=main',
+          '-C',
+          `N:${sid}`,
+          '-C',
+          'S:""',
+          '-C',
+          `N:${100000000 + model.uid}`,
+          '-C',
+          'S:DOWNLOAD',
+          '-C',
+          `N:${model.uid}`,
+          '-y',
+          `mp4:mfc_${100000000 + model.uid}.f4v`,
+          config.rtmpDebug ? '-V' : '',
+          '-o',
+          path.join(captureDirectory, filename)
+        ];
+      }
+
+      let captureProcess = childProcess.spawn('rtmpdump', args);
 
       if (!captureProcess.pid) {
         return;
@@ -334,7 +382,7 @@ function createCaptureProcess(model) {
 
   // just in case
   if (model.phase !== 'a') {
-    return;
+  //  return;
   }
 
   let captureModel = captureModels.find(m => (m.uid === model.uid));
@@ -409,10 +457,10 @@ function saveConfig() {
   // we should not have them, but just in case...
   config.models = config.models.filter((m, index, self) => (index === self.indexOf(m)));
 
-  printDebugMsg('Save changes in config-rtmp-hd.yml');
+  printDebugMsg('Save changes in config-rtmp.yml');
 
   return fs
-    .writeFileAsync('config-rtmp-hd.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8')
+    .writeFileAsync('config-rtmp.yml', yaml.safeDump(config).replace(/\n/g, EOL), 'utf8')
     .then(() => {
       isDirty = false;
     });
@@ -446,7 +494,8 @@ mkdir(captureDirectory);
 mkdir(completeDirectory);
 
 Promise
-  .try(() => mfcClient.connectAndWaitForModels())
+  .try(() => detectRtmpdump())
+  .then(() => mfcClient.connectAndWaitForModels())
   .timeout(120000) // if we could not get a list of online models in 2 minutes then exit
   .then(() => mainLoop())
   .catch(err => {
@@ -552,3 +601,22 @@ http.createServer((req, res) => {
   printMsg('Server listening on: ' + colors.green('0.0.0.0:' + config.port));
 });
 
+function detectRtmpdump() {
+  return new Promise((resolve, reject) => {
+    let rtmpdump = childProcess.spawn('rtmpdump', [
+      '--help'
+    ]);
+
+    rtmpdump.stderr.on('data', data => {
+      patchedRtmpdump = !!(data.toString().match(/mfc-node/));
+
+      if (patchedRtmpdump) {
+        printDebugMsg('Patched rtmpdump detected');
+      } else {
+        printMsg('Your ' + colors.green('rtmpdump') + ' supports only new HD models');
+      }
+
+      resolve();
+    });
+  });
+}

@@ -2,7 +2,6 @@
 
 var Promise = require('bluebird');
 var fs = Promise.promisifyAll(require('fs'));
-var S = require('string');
 var yaml = require('js-yaml');
 var colors = require('colors');
 var childProcess = require('child_process');
@@ -96,6 +95,7 @@ function getSpawnArguments(srcFile, dstFile) {
         '-c:a', 'copy',
         '-bsf:a', 'aac_adtstoasc',
         '-copyts',
+        '-start_at_zero',
         dstFile
       ]
       : [ // speex or something else

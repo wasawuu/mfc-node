@@ -28,3 +28,6 @@ node_modules
 
 .package.json.swp
 package-lock.json
+
+./captures
+./complete
