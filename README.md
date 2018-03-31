@@ -3,19 +3,15 @@ What's new?
 On March 23, MFC deployed a number of changes to support __OBS Studio__ and higher resolution (720p or 1080p) streams.
 RTMP versions of these streams can now be recorded with a regular `rtmpdump` without a necessity to have a patched version.
 
-Because of these changes all RTMP support was moved out to its own script `main-rtmp-hd.js`.
+Because of these changes all RTMP support was moved out to its own script `main-rtmp.js`.
 
 If you want to record HLS streams (old and new) you will have to use `main.js` script.
 
-If you want to record only new RTMP streams you will have to use `main-rtmp-hd.js` script.
+If you want to record RTMP streams you will have to use `main-rtmp.js` script.
+You will require to have "patched" version of `rtmpdump` to be able to record any stream, otherwise you will be limited by new HD streams only.
 
-Note: There is no guarantee that new screams will work well with proxyServer, therefore `proxyServer` parameter was removed from the `config.yml`.
+Note: There is no guarantee that new screams will work well with proxyServer, therefore `proxyServer` parameter was removed from config files.
 However, no one stops you from playing around and makes your own tests.
-
-Note: For all who uses "patched" version of `rtmpdump`, I'm working on `rtmpdump` to support both old and new streams.
-As for now, this version of the scripts does not work with "patched" `rtmpdump`. If you want to record everything in RTMP you will have to run two instances of the script:
-- the old one with "patched" `rtmdump` (for old streams)
-- the new `main-rtmp-hd.js` with the regular `rtmpdump` (for new streams)
 
 mfc-node
 ==========
@@ -104,6 +100,8 @@ Proxy
 This is just a Proof of Concept to avoid region block.
 To use it you have to start `proxy.js` on some remote server located in a different region then add a parameter `proxyServer` to your local `config.yml`, for example, `proxyServer: '54.206.109.161:9090'`.
 
-The `main.js` script will try to get models from remote region then merge with the list of models available in your region.
+The `main.js` script will try to get models from the remote region then merge them with the list of models available in your region.
 
 > Note: This is not a real-time application, expect inconsistency.
+
+> Note: There might be an issue with new HD streams.
