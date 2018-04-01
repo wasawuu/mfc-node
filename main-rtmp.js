@@ -240,15 +240,14 @@ function createRtmpCaptureProcess(model) {
 
       let sid = mfcClient.sessionId;
       let roomId = 100000000 + model.uid;
-
       let ctx = decodeURIComponent(mfcClient.stream_vidctx);
 
       let server;
-      let args;
+      let captureProcess;
 
       if (model.phase === 'a') {
         server = model.camserv - 1000;
-        args = [
+        captureProcess = childProcess.spawn('rtmpdump', [
           '-q',
           '-a',
           'NxServer',
@@ -263,9 +262,7 @@ function createRtmpCaptureProcess(model) {
           '-r',
           `rtmp://video${server}.myfreecams.com:1935/NxServer`,
           '-p',
-          // ip was set intentionally
-          'https://207.229.73.118/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
-          // 'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
+          'https://www.myfreecams.com/_html/player.html?broadcaster_id=0&vcc=1522120575&target=main',
           '-C',
           `N:${sid}`,
           '-C',
@@ -288,10 +285,10 @@ function createRtmpCaptureProcess(model) {
           '-o',
           path.join(captureDirectory, filename),
           '-m', 30
-        ];
+        ]);
       } else {
         server = model.camserv - 500;
-        args = [
+        captureProcess = childProcess.spawn('rtmpdump', [
           '-q',
           '-a',
           'NxServer',
@@ -322,10 +319,8 @@ function createRtmpCaptureProcess(model) {
           config.rtmpDebug ? '-V' : '',
           '-o',
           path.join(captureDirectory, filename)
-        ];
+        ]);
       }
-
-      let captureProcess = childProcess.spawn('rtmpdump', args);
 
       if (!captureProcess.pid) {
         return;
@@ -607,8 +602,14 @@ function detectRtmpdump() {
       '--help'
     ]);
 
+    let output = '';
+
     rtmpdump.stderr.on('data', data => {
-      patchedRtmpdump = !!(data.toString().match(/mfc-node/));
+      output += data.toString();
+    });
+
+    rtmpdump.on('close', code => {
+      patchedRtmpdump = !!(output.match(/mfc-node/));
 
       if (patchedRtmpdump) {
         printDebugMsg('Patched rtmpdump detected');

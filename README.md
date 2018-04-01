@@ -8,7 +8,14 @@ Because of these changes all RTMP support was moved out to its own script `main-
 If you want to record HLS streams (old and new) you will have to use `main.js` script.
 
 If you want to record RTMP streams you will have to use `main-rtmp.js` script.
-You will require to have "patched" version of `rtmpdump` to be able to record any stream, otherwise you will be limited by new HD streams only.
+You will require to have a new patched version of `rtmpdump` to be able to record any stream, otherwise you will be limited by new HD streams only.
+
+However, there is still a "workaround" if you have the old patched `rtmpdump` (only for Windows users):
+- rename the regular `rtmpdump.exe` attached to this package to `rtmpdump1.exe`,
+- keep two versions of `rtmpdump` (regular and patched) in the same folder with the script,
+- change the line 251 of `main-rtmp.js`, replace `'rtmpdump'` by `'rtmpdump1'`.
+
+The logic is simple: to use regular `rtmpdump1` for new streams and patched `rtmpdump` for other streams.
 
 Note: There is no guarantee that new screams will work well with proxyServer, therefore `proxyServer` parameter was removed from config files.
 However, no one stops you from playing around and makes your own tests.
