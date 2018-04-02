@@ -499,13 +499,9 @@
 
               m.rc = m.rc || 0;
 
-              camserv = (!vm.ngvideo_servers[m.camserv])
-                ? m.camserv - 500
-                : vm.ngvideo_servers[m.camserv];
-
-              m.snapshot = (m.phase === 'a')
-                ? 'https://snap.mfcimg.com/snapimg/' + camserv + '/320x240/mfc_a_' + (100000000 + m.uid)
-                : 'https://snap.mfcimg.com/snapimg/' + camserv + '/320x240/mfc_' + (100000000 + m.uid);
+              m.snapshot = !vm.ngvideo_servers[m.camserv]
+                ? 'https://snap.mfcimg.com/snapimg/' + (m.camserv - 500) + '/320x240/mfc_' + (100000000 + m.uid)
+                : 'https://snap.mfcimg.com/snapimg/' + vm.ngvideo_servers[m.camserv] + '/320x240/mfc_a_' + (100000000 + m.uid);
 
               return m;
             });
