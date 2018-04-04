@@ -46,6 +46,19 @@ var minFileSize = config.minFileSizeMb * 1048576;
 
 var mfcClient = new mfc.Client();
 
+var ngvideoServers = {
+  "1545": "545",
+  "1546": "546",
+  "1547": "547",
+  "1548": "548",
+  "1549": "549",
+  "1550": "550",
+  "1551": "551",
+  "1552": "552",
+  "1553": "553",
+  "1554": "554"
+};
+
 function getCurrentDateTime() {
   return colors.gray('[' + moment().format('MM/DD/YYYY - HH:mm:ss') + ']');
 }
@@ -232,9 +245,9 @@ function createFfmpegCaptureProcess(model) {
       let filename = model.nm + '-' + moment().format(config.dateFormat) + '-ts.ts';
       let roomId = 100000000 + model.uid;
 
-      let hlsUrl = (model.phase === 'a')
-        ? `https://video${model.camserv - 1000}.myfreecams.com:8444/x-hls/${mfcClient.stream_cxid}/${roomId}/${mfcClient.stream_password}/${mfcClient.stream_vidctx}/mfc_${model.phase}_${roomId}.m3u8`
-        : `http://video${model.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${roomId}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`;
+      let hlsUrl = (!ngvideoServers[model.camserv])
+        ? `http://video${model.camserv - 500}.myfreecams.com:1935/NxServer/ngrp:mfc_${roomId}.f4v_mobile/playlist.m3u8?nc=${Date.now()}`
+        : `https://video${ngvideoServers[model.camserv]}.myfreecams.com:8444/x-hls/${mfcClient.stream_cxid}/${roomId}/${mfcClient.stream_password}/${mfcClient.stream_vidctx}/mfc_${model.phase}_${roomId}.m3u8`;
 
       let captureProcess = childProcess.spawn('ffmpeg', [
         '-hide_banner',
@@ -433,7 +446,7 @@ function addInQueue(req, res) {
     if (req.params && req.params.expire_after) {
       let expireAfter = parseFloat(req.params.expire_after);
 
-      if (!isNaN(expireAfter) && expireAfter > 0) {
+      if (!Number.isNaN(expireAfter) && expireAfter > 0) {
         mode = moment().unix() + (expireAfter * 3600);
       }
     }
@@ -444,7 +457,7 @@ function addInQueue(req, res) {
   if (req.params && req.params.uid) {
     let uid = parseInt(req.params.uid, 10);
 
-    if (!isNaN(uid)) {
+    if (!Number.isNaN(uid)) {
       model = { uid: uid, mode: mode };
     }
   } else if (req.params && req.params.nm) {
